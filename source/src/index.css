@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Raleway:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Raleway", ui-sans-serif, system-ui, sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-qb-bg: #ebece7;
+  --color-qb-black: #596c70;
+  --color-qb-dark-grey: #657b80;
+  --color-qb-grey: #8c9699;
+  --color-qb-light-grey: #d1d5db;
+  --color-qb-box-bg: #e3e4e0;
+  --color-qb-orange: #ff7600;
+  --color-qb-magenta: #c11c4d;
+  --color-qb-cyan: #2dbcd2;
+  --color-qb-green: #51b53e;
+}
+
+body {
+  background-color: var(--color-qb-bg);
+  color: var(--color-qb-black);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar for elements with .no-scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Custom scrollbar for aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-qb-light-grey);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-qb-grey);
+}
+
+::highlight(pii-highlight) {
+  background-color: rgba(106, 82, 156, 0.2);
+  color: var(--color-qb-magenta);
+  font-weight: bold;
+}
+
+/* PII names inside a text editor, painted by the browser as part of the text
+   (see PIISuggestionOverlay.tsx), so the mark scrolls with it and stays inside
+   the box. Same pink as the boxes drawn over plain inputs. */
+::highlight(pii-suggest) {
+  background-color: rgba(193, 28, 77, 0.2);
+}
+
+/* ONE LOOK FOR RICH TEXT — Codex pages, MoM sections, and their editors.
+   Paragraphs used to be styled dark grey page by page while lists, bold text,
+   headings and plain text outside a paragraph kept the typography plugin's own
+   near-black slate. The same page then showed two text colours depending on
+   whether a line was a paragraph, a list item, or came from Markdown. Every
+   colour the plugin uses is set here, once, from the app's palette.
+   Unlayered, so it wins over the plugin's layered defaults. */
+.qb-prose {
+  --tw-prose-body: var(--color-qb-black);
+  --tw-prose-headings: var(--color-qb-black);
+  --tw-prose-lead: var(--color-qb-dark-grey);
+  --tw-prose-links: var(--color-qb-orange);
+  --tw-prose-bold: var(--color-qb-black);
+  --tw-prose-counters: var(--color-qb-grey);
+  --tw-prose-bullets: var(--color-qb-orange);
+  --tw-prose-hr: var(--color-qb-light-grey);
+  --tw-prose-quotes: var(--color-qb-dark-grey);
+  --tw-prose-quote-borders: var(--color-qb-orange);
+  --tw-prose-captions: var(--color-qb-grey);
+  --tw-prose-kbd: var(--color-qb-black);
+  --tw-prose-code: var(--color-qb-black);
+  --tw-prose-pre-code: #ffffff;
+  --tw-prose-pre-bg: var(--color-qb-black);
+  --tw-prose-th-borders: var(--color-qb-light-grey);
+  --tw-prose-td-borders: var(--color-qb-light-grey);
+  color: var(--tw-prose-body);
+  max-width: none;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.qb-prose.qb-prose-lg { font-size: 1.0625rem; }
+.qb-prose.qb-prose-strong { font-weight: 700; }
+.qb-prose :where(p, li, td, blockquote, div, span) { line-height: inherit; }
+.qb-prose :where(h1, h2, h3, h4) {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.qb-prose :where(h1) { font-size: 1.5em; }
+.qb-prose :where(h2) { font-size: 1.25em; }
+.qb-prose :where(h3, h4) { font-size: 1.05em; }
+.qb-prose :where(a) { font-weight: 700; }
+.qb-prose :where(code):not(:where(pre code)) {
+  background: var(--color-qb-box-bg);
+  padding: 0.15em 0.35em;
+  font-size: 0.875em;
+}
+
+/* Custom Table styling inside prose elements styling (MOM and Codex) */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  text-align: left;
+}
+.prose th {
+  background-color: var(--color-qb-box-bg);
+  color: var(--color-qb-black);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 0.5rem; /* Matches p-2 in table generator */
+  border: 1px solid var(--color-qb-light-grey);
+}
+.prose td {
+  padding: 0.5rem; /* Matches p-2 in table generator */
+  border: 1px solid var(--color-qb-light-grey);
+  font-size: 0.875rem;
+  background-color: transparent;
+  color: var(--color-qb-black);
+}
+/* Ensure block elements nested within pasted table cells do not inject unrequested outer margin or padding */
+.prose th p, .prose td p,
+.prose th div, .prose td div,
+.prose th h1, .prose td h1,
+.prose th h2, .prose td h2,
+.prose th h3, .prose td h3,
+.prose th h4, .prose td h4,
+.prose th h5, .prose td h5,
+.prose th h6, .prose td h6 {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: inherit;
+}
+.prose tr:nth-of-type(even) td {
+  background-color: rgba(0, 0, 0, 0.02);
+}

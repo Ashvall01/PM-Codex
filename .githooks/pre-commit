@@ -1,0 +1,34 @@
+#!/bin/sh
+# PM Codex secret guard — PLAN.md section 22.6.
+# Refuses a commit that would put a secret into git. Prints file names only,
+# never the secret itself.
+
+fail=0
+
+# 1. Files that must never be tracked: Pinokio's ENVIRONMENT, and any .env file
+#    except the .env.example template.
+bad_files=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -E '(^|/)(ENVIRONMENT|\.env(\..*)?)$' \
+  | grep -v -E '(^|/)\.env\.example$')
+if [ -n "$bad_files" ]; then
+  echo "pre-commit: refused — these files can hold secrets and must not be committed:"
+  echo "$bad_files" | sed 's/^/    /'
+  fail=1
+fi
+
+# 2. Secret-shaped text anywhere in what is staged:
+#    - a Google / Gemini API key (AIza + 35 characters)
+#    - an Apps Script web-app address (deployed for "Anyone", so the address opens the data)
+pattern='AIza[0-9A-Za-z_-]{35}|script\.google\.com/macros/s/[A-Za-z0-9_-]{20,}'
+hits=$(git grep --cached -I -l -E "$pattern" -- . ':(exclude).githooks/pre-commit')
+if [ -n "$hits" ]; then
+  echo "pre-commit: refused — secret-shaped text (API key or Apps Script address) found in:"
+  echo "$hits" | sed 's/^/    /'
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "Take the secret out, then commit again. See PLAN.md 22.6."
+  exit 1
+fi
+exit 0

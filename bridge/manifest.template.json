@@ -1,0 +1,84 @@
+{
+  "manifest_version": "0.3",
+  "name": "pm-codex-bridge",
+  "display_name": "PM Codex Bridge",
+  "version": "{{VERSION}}",
+  "description": "Connects Claude to PM Codex running on this computer. Claude reads your project and proposes changes; you approve them in the app.",
+  "long_description": "Starts the PM Codex bridge on this computer. Claude asks the bridge a question; the bridge asks your open PM Codex tab (http://localhost); the tab answers from its live state. Claude can file a batch of edits as a single change request, which appears in the app with Approve, Review and Reject buttons. Claude cannot change a project record itself - nothing happens until you sign off, and the outcome is reported back to Claude on its next call. Tasks, issues and deliverables can be archived and read back; fields can be checked against the app's own rules before a value is proposed. Made by the Connect to Claude button in Pinokio, for this computer's copy of PM Codex.",
+  "author": {
+    "name": "PM Codex"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "{{SERVER_PATH}}",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "{{SERVER_PATH}}"
+      ],
+      "env": {
+        "PM_CODEX_PORT": "{{APP_PORT}}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "start_session",
+      "description": "Load the master directive and a snapshot of the active project."
+    },
+    {
+      "name": "read_item",
+      "description": "Read one or many records in full, in a single call."
+    },
+    {
+      "name": "search_project",
+      "description": "Keyword search across the whole project."
+    },
+    {
+      "name": "read_archive",
+      "description": "List archived tasks, issues or deliverables. Left out of the snapshot and search on purpose."
+    },
+    {
+      "name": "get_current_screen",
+      "description": "See which module the user has open."
+    },
+    {
+      "name": "get_module",
+      "description": "Read one module of the project in full, for anything the snapshot held back."
+    },
+    {
+      "name": "get_field_schema",
+      "description": "The exact field rules for one module - enum values, computed fields, and the live risk matrix - so a proposal cannot fail silently on a misspelled value."
+    },
+    {
+      "name": "list_projects",
+      "description": "List every project and mark the active one."
+    },
+    {
+      "name": "refresh_state",
+      "description": "Pull a fresh project snapshot."
+    },
+    {
+      "name": "propose_changes",
+      "description": "File a batch of edits as one change request for you to approve."
+    },
+    {
+      "name": "discard_change",
+      "description": "Withdraw one proposed change from a pending request."
+    },
+    {
+      "name": "get_acr_status",
+      "description": "See what has been proposed, approved and rejected."
+    },
+    {
+      "name": "bridge_status",
+      "description": "Check whether the PM Codex tab is connected."
+    }
+  ],
+  "keywords": [
+    "pm-codex",
+    "project-management",
+    "propose-and-review"
+  ],
+  "license": "GPL-3.0-or-later"
+}
