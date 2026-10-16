@@ -75,6 +75,10 @@ Pinokio → **Update**, then **Start** again. If Claude is connected, quit and r
 - Rules for coding agents: `source/AGENTS.md`.
 - Code comments that cite `PLAN.md` point to the maintainer's design notes, which are not published.
 
+## Support
+
+PM Codex is free and open source. If you find it useful, you can [support its development](https://ko-fi.com/aldoveraldi).
+
 ## Licence
 
 Copyright (C) 2026 Aldo Veraldi
