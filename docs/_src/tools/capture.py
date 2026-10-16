@@ -34,22 +34,38 @@ RAW = tempfile.mkdtemp(prefix="pmc-capture-")
 
 # ------------------------------------------------------------------ sample project
 P = "p1"
-def act(i, phase, a, w, prog, status, owner, s, e, as_="", ae=""):
-    return dict(id=f"a{i}", phase=phase, activity=a, subActivity="", weight=w, progress=prog, status=status, owner=owner,
+def act(i, phase, a, w, prog, status, owner, s, e, as_="", ae="", sub=""):
+    return dict(id=f"a{i}", phase=phase, activity=a, subActivity=sub, weight=w, progress=prog, status=status, owner=owner,
                 targetStartDate=s, targetCompletionDate=e, actualStartDate=as_, actualCompletionDate=ae, remarks="")
+# Phases hold activities, activities hold sub-activities: each row is one bar.
 ACTS = [
-    act(1, "1. Discovery", "Requirements workshops", 8, 1, "Completed", "Maya", "2026-08-03", "2026-08-21", "2026-08-03", "2026-08-20"),
-    act(2, "1. Discovery", "Process maps signed off", 4, 1, "Completed", "Priya", "2026-08-17", "2026-08-28", "2026-08-17", "2026-08-28"),
-    act(3, "2. Design", "Solution design", 8, 1, "Completed With Delay", "Jonas", "2026-08-31", "2026-09-18", "2026-08-31", "2026-09-21"),
-    act(4, "2. Design", "Data mapping v2", 6, 0.8, "In Progress", "Priya", "2026-09-14", "2026-10-09", "2026-09-14"),
-    act(5, "3. Build", "Configure modules", 14, 0.55, "In Progress", "Jonas", "2026-09-21", "2026-10-30", "2026-09-21"),
-    act(6, "3. Build", "Data migration scripts", 10, 0.45, "In Progress", "Rafi", "2026-09-28", "2026-10-30", "2026-10-01"),
-    act(7, "3. Build", "Integrations", 8, 0.2, "In Progress", "Rafi", "2026-10-05", "2026-11-06", "2026-10-07"),
-    act(8, "4. UAT", "UAT round 1", 10, 0, "Not Started", "Priya", "2026-11-02", "2026-11-13"),
-    act(9, "4. UAT", "UAT round 2", 6, 0, "Not Started", "Priya", "2026-11-16", "2026-11-27"),
-    act(10, "5. Go-live", "Training", 8, 0.1, "In Progress", "Leo", "2026-10-12", "2026-11-27", "2026-10-12"),
-    act(11, "5. Go-live", "Cutover", 6, 0, "Not Started", "Maya", "2026-11-30", "2026-12-04"),
-    act(12, "5. Go-live", "Hypercare", 2, 0, "Not Started", "Jonas", "2026-12-07", "2026-12-18"),
+    act(1, "1. Discovery", "1. Kickoff", 2, 1, "Completed", "Maya", "2026-08-03", "2026-08-07", "2026-08-03", "2026-08-07", sub="Kickoff workshop"),
+    act(2, "1. Discovery", "2. Requirements", 3, 1, "Completed", "Priya", "2026-08-03", "2026-08-14", "2026-08-03", "2026-08-14", sub="Finance workshops"),
+    act(3, "1. Discovery", "2. Requirements", 3, 1, "Completed", "Jonas", "2026-08-10", "2026-08-21", "2026-08-10", "2026-08-20", sub="Supply chain workshops"),
+    act(4, "1. Discovery", "2. Requirements", 2, 1, "Completed", "Priya", "2026-08-17", "2026-08-28", "2026-08-17", "2026-08-28", sub="Process maps sign-off"),
+    act(5, "2. Design", "1. Solution design", 3, 1, "Completed With Delay", "Jonas", "2026-08-31", "2026-09-11", "2026-08-31", "2026-09-15", sub="Finance design"),
+    act(6, "2. Design", "1. Solution design", 3, 1, "Completed", "Jonas", "2026-09-07", "2026-09-18", "2026-09-07", "2026-09-18", sub="Supply chain design"),
+    act(7, "2. Design", "1. Solution design", 2, 1, "Completed", "Maya", "2026-09-21", "2026-09-25", "2026-09-21", "2026-09-25", sub="Design sign-off"),
+    act(8, "2. Design", "2. Data mapping", 2, 1, "Completed", "Priya", "2026-09-14", "2026-09-25", "2026-09-14", "2026-09-25", sub="Mapping v1"),
+    act(9, "2. Design", "2. Data mapping", 3, 0.8, "In Progress", "Priya", "2026-09-28", "2026-10-09", "2026-09-28", sub="Mapping v2"),
+    act(10, "2. Design", "2. Data mapping", 2, 0.3, "In Progress", "Priya", "2026-10-12", "2026-10-23", "2026-10-12", sub="Finance review"),
+    act(11, "3. Build", "1. Configuration", 4, 1, "Completed", "Jonas", "2026-09-21", "2026-10-09", "2026-09-21", "2026-10-08", sub="Chart of accounts"),
+    act(12, "3. Build", "1. Configuration", 4, 0.6, "In Progress", "Jonas", "2026-09-28", "2026-10-23", "2026-09-28", sub="Procurement"),
+    act(13, "3. Build", "1. Configuration", 4, 0.35, "In Progress", "Jonas", "2026-10-05", "2026-10-30", "2026-10-06", sub="Inventory"),
+    act(14, "3. Build", "1. Configuration", 3, 0, "Not Started", "Jonas", "2026-10-19", "2026-11-06", sub="Reporting"),
+    act(15, "3. Build", "2. Data migration", 4, 0.45, "In Progress", "Rafi", "2026-09-28", "2026-10-23", "2026-10-01", sub="Extraction scripts"),
+    act(16, "3. Build", "2. Data migration", 3, 0.3, "In Progress", "Rafi", "2026-10-05", "2026-10-30", "2026-10-07", sub="Cleansing rules"),
+    act(17, "3. Build", "2. Data migration", 2, 0, "Not Started", "Rafi", "2026-11-02", "2026-11-06", sub="Trial load"),
+    act(18, "3. Build", "3. Integrations", 3, 0.3, "In Progress", "Rafi", "2026-10-05", "2026-10-23", "2026-10-05", sub="Bank interface"),
+    act(19, "3. Build", "3. Integrations", 3, 0.1, "In Progress", "Rafi", "2026-10-12", "2026-11-06", "2026-10-13", sub="Warehouse scanners"),
+    act(20, "4. UAT", "1. User acceptance", 4, 0, "Not Started", "Priya", "2026-11-02", "2026-11-13", sub="Round 1"),
+    act(21, "4. UAT", "1. User acceptance", 3, 0, "Not Started", "Priya", "2026-11-16", "2026-11-25", sub="Round 2"),
+    act(22, "4. UAT", "1. User acceptance", 1, 0, "Not Started", "Maya", "2026-11-26", "2026-11-27", sub="UAT sign-off"),
+    act(23, "5. Go-live", "1. Training", 2, 0.2, "In Progress", "Leo", "2026-10-12", "2026-10-23", "2026-10-12", sub="Train the trainers"),
+    act(24, "5. Go-live", "1. Training", 3, 0, "Not Started", "Leo", "2026-11-02", "2026-11-27", sub="End-user training"),
+    act(25, "5. Go-live", "2. Cutover", 1, 0, "Not Started", "Maya", "2026-11-23", "2026-11-25", sub="Cutover rehearsal"),
+    act(26, "5. Go-live", "2. Cutover", 2, 0, "Not Started", "Maya", "2026-11-30", "2026-12-04", sub="Cutover"),
+    act(27, "5. Go-live", "2. Cutover", 2, 0, "Not Started", "Jonas", "2026-12-07", "2026-12-18", sub="Hypercare"),
 ]
 TS = [1791511920000, 1791790200000, 1791860700000, 1791970800000]  # 9, 12, 13, 14 Oct 2026
 COMMENTS = {
@@ -139,7 +155,7 @@ CLAUDE_ACR = dict(id="acr1", sessionId="claude", projectId=P, origin="claude", s
                    impactArea="Legal", impactLevel="High", probability="Moderate", riskValue="High", owner="Rafi", status="Open")),
     dict(id="c3", approved=True, name="addDeliverableComment", changeTitle="Note the extra review round on the mapping spec",
          args=dict(deliverableId="d2", text="Steering 14 Oct: finance wants one more review round before sign-off.")),
-    dict(id="c4", approved=False, name="updateTimelineRow", changeTitle="Data migration scripts: 45% to 55%", args=dict(id="a6", progress=0.55)),
+    dict(id="c4", approved=False, name="updateTimelineRow", changeTitle="Extraction scripts: 45% to 55%", args=dict(id="a15", progress=0.55)),
 ])
 GEMINI_ACR = dict(id="acr2", sessionId="sess1", projectId=P, origin="gemini", status="pending", createdAt="2026-10-15T08:01:00Z", changes=[
     dict(id="g1", approved=True, name="flagTask", args=dict(id="t3"), changeTitle="Flag: Collect sign-off on data mapping v2")])
@@ -169,6 +185,12 @@ def store(gemini=False):
     }
 
 # ------------------------------------------------------------------ capture runs
+# React keeps form values in properties; copy them to attributes so the markup shows them.
+SYNC_FORMS = """() => {
+  document.querySelectorAll('select').forEach(s => [...s.options].forEach(o => o.toggleAttribute('selected', o.selected)));
+  document.querySelectorAll('input').forEach(i => { if (i.type === 'checkbox' || i.type === 'radio') i.toggleAttribute('checked', i.checked); else i.setAttribute('value', i.value); });
+  document.querySelectorAll('textarea').forEach(t => { t.textContent = t.value; });
+}"""
 GRAB_TRAY = """() => [...document.querySelectorAll('div.fixed')].filter(el => el.className.includes('right-0') && el.className.includes('top-0')
   && el.getBoundingClientRect().left < window.innerWidth - 5 && el.getBoundingClientRect().width > 100).map(el => el.outerHTML).join('')"""
 
@@ -193,6 +215,7 @@ def run(steps, gemini=False):
                 (pg.get_by_text(sel[5:], exact=False) if sel.startswith("text:") else pg.locator(sel)).first.click()
                 pg.wait_for_timeout(1500)
             elif k == "grab":
+                pg.evaluate(SYNC_FORMS)
                 open(f"{RAW}/{st[1]}.main.html", "w").write(pg.evaluate("document.querySelector('main').innerHTML"))
                 tray = pg.evaluate(GRAB_TRAY)
                 if tray:
@@ -211,9 +234,10 @@ def capture():
          ["click", "text:Move the mapping sign-off"], ["grab", "tasks_p"],
          ["click", "text:Add risk: test data"], ["grab", "risks_p"],
          ["click", "text:Note the extra review"], ["grab", "deliverables_p"],
-         ["click", "text:Data migration scripts: 45"], ["grab", "timeline_p"]])
+         ["click", "text:Extraction scripts: 45"], ["grab", "timeline_p"]])
     run([["goto", "overview"], ["click", "text:Claude has proposed"], ["click", "aside [type=checkbox] >> nth=4"],
          ["click", 'aside button:text-is("SIGN OFF")'],
+         ["goto", "overview"], ["grab", "overview_s4"],
          ["goto", "tasks-issues"], ["grab", "tasks_s"], ["click", "text:Collect sign-off on data mapping"], ["grab", "tasks_s_t3"],
          ["goto", "risks"], ["grab", "risks_s"], ["click", "text:Test data not anonymised"], ["grab", "risks_s_r6"],
          ["goto", "deliverables"], ["grab", "deliverables_s"], ["click", "text:Data mapping specification"], ["grab", "deliverables_s_d2"],
@@ -299,8 +323,15 @@ def process():
         tray = soup_of(open(f"{RAW}/{src}.tray.html").read()).find("div")
         html = clean(str(tray), tray=True).replace(" translate-x-0", "", 1)
         open(f"{OUT}/{name}.html", "w").write(re.sub(r'class="absolute ', f'data-tray="{name}" class="absolute ', html, count=1))
-    # The Overview, with hooks for what the demo redraws (demo.js paintOverview)
-    root = soup_of(open(f"{RAW}/overview_b.main.html").read())
+    # The Overview, with hooks for what the demo redraws (demo.js paintOverview).
+    # overview_s4 is the same screen after every Claude line is signed off; the
+    # demo takes its schedule tile and Build row when the migration line applies.
+    hook_overview("overview_b", "overview")
+    hook_overview("overview_s4", "overview_s4")
+    print("captures written to", os.path.normpath(OUT))
+
+def hook_overview(src, name):
+    root = soup_of(open(f"{RAW}/{src}.main.html").read())
     for h3 in root.find_all("h3"):
         key = {"Schedule": "schedule", "Finish": "finish", "Late": "late", "Due in 7 days": "soon", "High risks": "high"}.get(h3.get_text(" ", strip=True))
         if not key:
@@ -335,8 +366,7 @@ def process():
     row["data-phase"] = "build"
     row.find("span", class_="font-mono")["data-v"] = "pct"
     row.find(lambda t: t.name == "div" and {"h-1.5", "bg-qb-box-bg"} <= set(t.get("class") or [])).find("div")["data-v"] = "bar"
-    open(f"{OUT}/overview.html", "w").write(clean(inner(root)))
-    print("captures written to", os.path.normpath(OUT))
+    open(f"{OUT}/{name}.html", "w").write(clean(inner(root)))
 
 if __name__ == "__main__":
     capture()

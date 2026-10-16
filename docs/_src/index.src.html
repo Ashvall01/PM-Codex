@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PM Codex — project management with an AI that asks first</title>
-<meta name="description" content="A free, open-source project management app that runs on your computer, keeps your data in your own Google Sheet, and works with Claude. The assistant proposes; nothing changes until you sign off.">
+<meta name="description" content="Vibe coding, for project management. Tell PM Codex what happened and its AI assistant updates your tasks, risks, timeline and minutes; nothing changes until you sign off. Free and open source; runs on your computer with your data in your own Google Sheet.">
 <meta name="theme-color" content="#ebece7">
 <meta property="og:type" content="website">
 <meta property="og:title" content="PM Codex — AI proposes. You sign off.">
-<meta property="og:description" content="Project management on your own computer, with your data in your own Google Sheet. The assistant proposes; nothing changes until you sign off.">
+<meta property="og:description" content="Vibe coding, for project management. Tell it what happened; the AI updates your plan, and nothing changes until you sign off.">
 <meta property="og:url" content="https://ashvall01.github.io/PM-Codex/">
 <meta property="og:image" content="https://ashvall01.github.io/PM-Codex/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -72,9 +72,10 @@
 <!-- ============================================================ HERO -->
 <section id="top" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-12 sm:pt-20">
   <h1 class="font-black uppercase text-qb-black leading-[0.98] tracking-[0.04em] text-[clamp(2.4rem,6.4vw,5.25rem)]">AI proposes.<br>You sign off.</h1>
-  <div class="mt-8 grid lg:grid-cols-12 gap-10 lg:gap-12 items-end">
+  <p class="mt-6 max-w-[30ch] text-[clamp(1.4rem,2.7vw,2.1rem)] font-bold leading-snug text-qb-black">Vibe coding, for project management.</p>
+  <div class="mt-6 grid lg:grid-cols-12 gap-10 lg:gap-12 items-end">
     <div class="lg:col-span-7">
-      <p class="max-w-[58ch] text-[17px] sm:text-lg leading-[1.7] text-qb-black">PM Codex is a project management app that runs on your own computer and keeps your data in your own Google Sheet. Claude, and the built-in Gemini assistant, read your project and propose changes. Nothing changes until you review them.</p>
+      <p class="max-w-[58ch] text-[17px] sm:text-lg leading-[1.7] text-qb-black">Tell PM Codex what happened, in plain words: a meeting, a slipped date, a new risk. Its AI assistant updates the tasks, risks, timeline and minutes for you, and every change waits for your sign-off. It runs on your own computer and keeps your data in your own Google Sheet.</p>
       <div class="mt-8 flex flex-wrap items-center gap-3">
         <a href="https://pinokio.co/apps/github-com-ashvall01-pm-codex" class="flex items-center gap-2 bg-qb-orange hover:bg-qb-orange/90 text-white px-5 py-3 text-xs font-black uppercase tracking-widest transition-colors"><i data-icon="download" class="w-4 h-4"></i>Install with Pinokio</a>
         <a href="https://github.com/Ashvall01/PM-Codex" class="flex items-center gap-2 bg-qb-box-bg hover:bg-qb-light-grey text-qb-black px-5 py-3 text-xs font-black uppercase tracking-widest transition-colors"><i data-icon="github" class="w-4 h-4"></i>View the source</a>
@@ -90,6 +91,40 @@
       </dl>
     </div>
   </div>
+
+  <!-- Vibe PM: what you say, and the change it becomes -->
+  <ul class="mt-14 grid md:grid-cols-3 gap-px bg-qb-light-grey border border-qb-light-grey" aria-label="Examples">
+    <li class="bg-qb-bg p-5 flex flex-col">
+      <span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">You say</span>
+      <p class="mt-2 self-start bg-qb-black text-white px-4 py-3 text-sm leading-relaxed font-medium">Steering moved the mapping sign-off to the 23rd.</p>
+      <span class="mt-5 text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">It proposes</span>
+      <div class="mt-2 border-l-4 border-[#ff7600] bg-[#ff7600]/5 px-3 py-2.5">
+        <p class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#ff7600]"><i data-icon="pencil" class="w-3.5 h-3.5"></i>Proposed edit</p>
+        <p class="mt-1.5 text-sm font-bold text-qb-black">Collect sign-off on data mapping v2</p>
+        <p class="mt-1 text-[11px] font-mono text-qb-dark-grey">EST. RESOLUTION <span class="line-through text-qb-grey">16 OCT</span> → <b class="text-qb-black">23 OCT</b></p>
+      </div>
+    </li>
+    <li class="bg-qb-bg p-5 flex flex-col">
+      <span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">You say</span>
+      <p class="mt-2 self-start bg-qb-black text-white px-4 py-3 text-sm leading-relaxed font-medium">Rafi says the test data isn't anonymised yet.</p>
+      <span class="mt-5 text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">It proposes</span>
+      <div class="mt-2 border-l-4 border-[#51b53e] bg-[#51b53e]/5 px-3 py-2.5">
+        <p class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#51b53e]"><i data-icon="plus" class="w-3.5 h-3.5"></i>Proposed new risk</p>
+        <p class="mt-1.5 text-sm font-bold text-qb-black">Test data not anonymised before UAT</p>
+        <p class="mt-1 text-[11px] font-mono text-qb-dark-grey">HIGH IMPACT · MODERATE PROBABILITY · RAFI</p>
+      </div>
+    </li>
+    <li class="bg-qb-bg p-5 flex flex-col">
+      <span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">You say</span>
+      <p class="mt-2 self-start bg-qb-black text-white px-4 py-3 text-sm leading-relaxed font-medium">Here's the recording of today's steering.</p>
+      <span class="mt-5 text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">It proposes</span>
+      <div class="mt-2 border-l-4 border-[#51b53e] bg-[#51b53e]/5 px-3 py-2.5">
+        <p class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#51b53e]"><i data-icon="plus" class="w-3.5 h-3.5"></i>Proposed minutes</p>
+        <p class="mt-1.5 text-sm font-bold text-qb-black">Weekly steering, 14 Oct</p>
+        <p class="mt-1 text-[11px] font-mono text-qb-dark-grey">2 DECISIONS · 3 ACTION ITEMS</p>
+      </div>
+    </li>
+  </ul>
 </section>
 
 <!-- ============================================================ THE DEMO
@@ -533,10 +568,14 @@
   const fit = t => {
     // A phone gets a narrower window, so the screen stays readable at its size.
     const f = t.parentElement, vw = window.innerWidth < 640 ? 860 : +t.dataset.vw, sc = f.clientWidth / vw, vh = f.clientHeight / sc;
+    // Sizing is not a hover: no zoom from full size on the way in.
+    t.style.transition = 'none';
     Object.assign(t.style, { width: `${vw}px`, height: `${vh}px` });
     t.style.setProperty('--s', sc);
     const inner = t.firstElementChild?.firstElementChild;
     if (inner) t.style.setProperty('--pan', `${-Math.max(0, Math.min(inner.scrollHeight - vh, vh * 0.55))}px`);
+    void t.offsetWidth;
+    t.style.transition = '';
   };
   const build = t => {
     const src = document.getElementById(`tpl-${t.dataset.capture}`);
@@ -545,6 +584,7 @@
     $$('[id]', t).forEach(n => n.removeAttribute('id'));
     $$('a, button, input, select, textarea, [tabindex]', t).forEach(n => n.setAttribute('tabindex', '-1'));
     fit(t);
+    window.PMCGantt?.prepare(t);
   };
   const thumbs = $$('.mod-thumb');
   const near = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { near.unobserve(e.target); build(e.target); } }), { rootMargin: '600px 0px' });

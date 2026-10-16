@@ -44,7 +44,7 @@
     c1: { acr: 'claude', kind: 'update', title: 'Move the mapping sign-off to 23 Oct', on: 'Collect sign-off on data mapping v2', action: 'update Task', summary: '2 fields change', route: 'tasks', tray: 't3' },
     c2: { acr: 'claude', kind: 'add', title: 'Add risk: test data not anonymised', action: 'add Project Risk', summary: '9 fields change', route: 'risks', tray: 'r6' },
     c3: { acr: 'claude', kind: 'comment', title: 'Note the extra review round on the mapping spec', action: 'add Deliverable Comment', summary: 'A new comment will be added', text: 'Steering 14 Oct: finance wants one more review round before sign-off.', route: 'deliverables', tray: 'd2' },
-    c4: { acr: 'claude', kind: 'update', title: 'Data migration scripts: 45% to 55%', on: 'Data migration scripts', action: 'update Timeline Row', summary: '1 field change', route: 'timeline' },
+    c4: { acr: 'claude', kind: 'update', title: 'Extraction scripts: 45% to 55%', on: '2. Data migration', action: 'update Timeline Row', summary: '1 field change', route: 'timeline' },
     g1: { acr: 'gemini', kind: 'update', title: 'Flag: Collect sign-off on data mapping v2', on: 'Collect sign-off on data mapping v2', action: 'flag Task', summary: '1 field change', route: 'tasks', tray: 't3' },
   };
   const ACR_OF = { claude: ['c1', 'c2', 'c3', 'c4'], gemini: ['g1'] };
@@ -116,7 +116,7 @@
     view.scrollTop = 0;
     if (S.route === 'overview') paintOverview();
     if (S.route === 'tasks') patchTaskRow();
-    if (S.route === 'timeline') scrollGanttToToday();
+    if (S.route === 'timeline') { ganttToToday(view); attachGantt(view); }
     $$('[data-open]', view).forEach(r => { r.setAttribute('tabindex', '0'); r.setAttribute('role', 'button'); r.dataset.h = `open:${r.dataset.open}`; });
     $$('[data-row]', view).forEach(r => r.setAttribute('tabindex', '-1'));
     $$('#app-nav [data-route]').forEach(b => {
@@ -143,15 +143,124 @@
     span.innerHTML = `${longDate(iso)}${d.tag ? `<span class="ml-1.5 font-black">· ${d.tag}</span>` : ''}`;
   }
 
-  function scrollGanttToToday() {
-    const mark = $$('*', view).find(el => el.childElementCount === 0 && el.textContent.trim() === 'PRESENT');
-    if (!mark) return;
-    let sc = mark.parentElement;
-    while (sc && sc !== view && !(sc.scrollWidth > sc.clientWidth + 4 && /(auto|scroll)/.test(getComputedStyle(sc).overflowX))) sc = sc.parentElement;
-    if (!sc || sc === view) return;
-    const r = mark.getBoundingClientRect(), b = sc.getBoundingClientRect();
-    sc.scrollLeft += (r.left - b.left) - b.width * 0.45;
+  // ------------------------------------------------------------ the Gantt (GanttChart.tsx)
+  // A captured chart is one frozen frame: its waves stand still, and bars that
+  // were off screen at capture were never drawn (the app draws a bar's line when
+  // it scrolls into view). These do the same work the app does, with its numbers.
+  const WAVES_CONFIG = [
+    { amp: 32, freq: 0.003, base: 50, speed: 0.8, phase: 0 },
+    { amp: 42, freq: 0.002, base: 40, speed: 1.2, phase: 2 },
+    { amp: 22, freq: 0.004, base: 60, speed: 0.5, phase: 4 },
+    { amp: 36, freq: 0.0025, base: 45, speed: 1.0, phase: 1 },
+  ];
+  const TASK_WAVE_CONFIGS = [
+    { interactAmp: 12, freq: 0.06, speed: 2.0 },
+    { interactAmp: 18, freq: 0.04, speed: 1.5 },
+    { interactAmp: 25, freq: 0.03, speed: 1.0 },
+  ];
+  const DAY_WIDTH = 12; // the app's DAY_WIDTH at 1.0x, as captured
+  const LABEL_COLUMN = 180;
+  const charts = new Set();
+  const mouse = { x: -9999, y: -9999 };
+  window.addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+
+  const ganttScroller = root => {
+    const label = $$('div', root).find(el => el.childElementCount === 0 && el.textContent.trim().toUpperCase() === 'PRESENT');
+    let sc = label?.parentElement;
+    while (sc && sc !== root && !/(auto|scroll)/.test(getComputedStyle(sc).overflowX)) sc = sc.parentElement;
+    return { sc: sc && sc !== root ? sc : null, marker: label?.parentElement };
+  };
+
+  // Open on today, a third of the way across, and down to the first activity
+  // with work left (scrollToToday in GanttChart.tsx).
+  function ganttToToday(root) {
+    const { sc, marker } = ganttScroller(root);
+    if (!sc || !marker) return;
+    const b = sc.getBoundingClientRect();
+    const k = b.width / sc.offsetWidth || 1; // previews are drawn scaled
+    const x = (marker.getBoundingClientRect().left - b.left) / k + sc.scrollLeft;
+    sc.scrollLeft = Math.max(0, x - LABEL_COLUMN - (sc.clientWidth - LABEL_COLUMN) * 0.3);
+    const group = sc.querySelector('[data-gantt-group="2. Design-2. Data mapping"]');
+    if (group) sc.scrollTop = Math.max(0, (group.getBoundingClientRect().top - b.top) / k + sc.scrollTop - 48 - 40);
   }
+
+  function restingLine(path, width) { path.setAttribute('d', `M 0 15 L ${width} 15`); }
+
+  function attachGantt(root, { interactive = true } = {}) {
+    const bg = $$('svg', root).find(svg => (svg.getAttribute('viewBox') || '') === '0 0 1000 100');
+    const { sc } = ganttScroller(root);
+    if (!bg || !sc) return;
+    const tasks = $$('svg', root).filter(svg => (svg.getAttribute('style') || '').includes('top: -14px')).map(svg => {
+      const width = parseFloat(svg.style.width) || 0;
+      const paths = $$('path', svg);
+      paths.forEach(path => restingLine(path, width));
+      return { svg, paths, width, t: Math.random() * 100, live: false };
+    });
+    const chart = { root, sc, bgPaths: $$('path', bg), tasks, interactive, time: 0, last: 0, lastScroll: sc.scrollLeft, smoothed: 0, offset: 0, visible: true };
+    const io = new IntersectionObserver(([e]) => { chart.visible = e.isIntersecting; }, { threshold: 0 });
+    io.observe(root);
+    chart.io = io;
+    charts.add(chart);
+    if (!loopRunning) { loopRunning = true; requestAnimationFrame(loop); }
+  }
+
+  function drawTaskWave(tw, chart) {
+    const { width } = tw;
+    const scaleRange = 4 * DAY_WIDTH;
+    const mult = Math.max(0, Math.min(1, (width - DAY_WIDTH) / scaleRange));
+    const r = tw.svg.getBoundingClientRect();
+    const near = chart.interactive && mult > 0 && mouse.x >= r.left - 150 && mouse.x <= r.right + 150 && Math.abs(r.top + 15 - mouse.y) < 150;
+    if (!near) { if (tw.live) { tw.paths.forEach(p => restingLine(p, width)); tw.live = false; } return; }
+    tw.live = true;
+    tw.t += 0.05;
+    const step = Math.max(12, Math.min(24, width / 15));
+    const sx = r.width / width || 1; // the chart may be scaled (module previews)
+    tw.paths.forEach((path, i) => {
+      const c = TASK_WAVE_CONFIGS[i];
+      if (!c) return;
+      let d = 'M 0 15';
+      for (let x = 0; x <= width; x += step) {
+        const taper = Math.sin((x / width) * Math.PI);
+        const dist = Math.hypot(r.left + x * sx - mouse.x, r.top + 15 - mouse.y);
+        const amp = (dist < 150 ? ((150 - dist) / 150) * c.interactAmp : 0) * taper * mult;
+        d += ` L ${x} ${15 + Math.sin(x * c.freq - tw.t * c.speed) * amp}`;
+      }
+      path.setAttribute('d', `${d} L ${width} 15`);
+    });
+  }
+
+  let loopRunning = false;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    charts.forEach(ch => {
+      if (!ch.root.isConnected) { ch.io.disconnect(); charts.delete(ch); return; }
+      if (!ch.visible) return;
+      // The background waves: 12 redraws a second at rest, 30 while scrolling.
+      const scrolling = Math.abs(ch.smoothed) > 0.05 || ch.sc.scrollLeft !== ch.lastScroll;
+      const interval = scrolling ? 1000 / 30 : 1000 / 12;
+      if (!ch.last || now - ch.last >= interval) {
+        const frames = ch.last ? Math.min(8, (now - ch.last) / (1000 / 30)) : 1;
+        ch.last = now;
+        ch.time += 0.004 * frames;
+        const delta = ch.sc.scrollLeft - ch.lastScroll;
+        ch.lastScroll = ch.sc.scrollLeft;
+        ch.smoothed += (delta - ch.smoothed) * 0.08;
+        ch.offset += ch.smoothed * 0.015;
+        const total = ch.time + ch.offset;
+        ch.bgPaths.forEach((path, i) => {
+          const w = WAVES_CONFIG[i];
+          if (!w) return;
+          let d = `M 0 ${w.base}`;
+          for (let x = 0; x <= 1000; x += 40) d += ` L ${x} ${w.base + Math.sin(x * w.freq + total * w.speed + w.phase) * w.amp}`;
+          path.setAttribute('d', d);
+        });
+      }
+      if (ch.interactive) ch.tasks.forEach(tw => drawTaskWave(tw, ch));
+    });
+  }
+  // The module previews on the page use the same chart.
+  window.PMCGantt = { prepare(root) { ganttToToday(root); attachGantt(root, { interactive: false }); } };
+  $$('.mod-thumb').forEach(t => { if (t.firstElementChild) window.PMCGantt.prepare(t); });
 
   // ------------------------------------------------------------ Overview (live numbers)
   const KIND_COLOR = { TASK: C.dark, ISSUE: C.magenta, DELIVERABLE: C.cyan, ACTIVITY: C.orange, RISK: C.magenta, ACTION: C.green };
@@ -166,68 +275,84 @@
   };
   const VALUE_COLOR = { Lowest: C.light, Low: C.green, Medium: C.orange, High: C.magenta, Highest: C.magenta };
 
-  function overviewItems() {
-    const dated = [
-      { id: 'del-mapping', kind: 'DELIVERABLE', title: 'Data mapping specification', owner: 'Priya', date: '2026-10-09', go: ['deliverables', 'd2'] },
-      { id: 'act-mapping', kind: 'ACTIVITY', title: 'Data mapping v2', owner: 'Priya', date: '2026-10-09', go: ['timeline'] },
-      { id: 'tsk-accounts', kind: 'TASK', title: 'Confirm UAT test accounts with IT', owner: 'Rafi', date: '2026-10-13', go: ['tasks'] },
-      { id: 'tsk-signoff', kind: 'TASK', title: 'Collect sign-off on data mapping v2', owner: 'Priya', date: signoffDate(), go: ['tasks', 't3'] },
-      { id: 'iss-dupes', kind: 'ISSUE', title: 'Duplicate supplier records in legacy export', owner: 'Rafi', date: '2026-10-20', go: ['tasks'] },
-      { id: 'act-window', kind: 'ACTION', title: 'Confirm the UAT window with finance leads', owner: 'Priya', date: '2026-10-21', go: ['mom'] },
-      { id: 'tsk-runbook', kind: 'TASK', title: 'Draft the cutover runbook', owner: 'Maya', date: '2026-10-22', go: ['tasks'] },
-    ].map(i => ({ ...i, ...dueTag(i.date) }));
-    const late = dated.filter(i => i.state === 'late').sort((a, b) => daysFromToday(a.date) - daysFromToday(b.date));
-    const soon = dated.filter(i => i.state === 'soon').sort((a, b) => daysFromToday(a.date) - daysFromToday(b.date));
-    const blocked = [{ id: 'iss-sandbox', kind: 'ISSUE', title: 'Vendor sandbox times out on bulk import', owner: 'Jonas', tag: 'BLOCKED', tone: 'magenta', go: ['tasks'] }];
-    const risks = [
-      ...(S.applied.c2 ? [{ id: 'rsk-testdata', kind: 'RISK', title: "Test data not anonymised before UAT. If it isn't, UAT waits for a clean extract.", owner: 'Rafi', go: ['risks', 'r6'], fresh: !S.seen.risk }] : []),
-      { id: 'rsk-leave', kind: 'RISK', title: 'Key users on year-end leave during UAT', owner: 'Priya', go: ['risks'] },
-      { id: 'rsk-quality', kind: 'RISK', title: 'Legacy data quality below migration threshold', owner: 'Rafi', go: ['risks'] },
-      { id: 'rsk-patch', kind: 'RISK', title: 'Vendor patch slips past go-live', owner: 'Jonas', go: ['risks'] },
-    ].map(r => ({ ...r, tag: 'HIGH', tone: 'magenta' }));
-    return { items: [...late, ...blocked, ...risks, ...soon], late: late.length, soon: soon.length, all: dated };
+  // The captured Overview is the real screen; the demo re-reads its lists and
+  // re-applies what was signed off, so every count and row follows the app's rules.
+  const SIGNOFF = 'Collect sign-off on data mapping v2';
+  const NEW_RISK = "Test data not anonymised before UAT. If it isn't, UAT waits for a clean extract.";
+  const goFor = (kind, title) => {
+    if (title === SIGNOFF) return ['tasks', 't3'];
+    if (title === 'Data mapping specification') return ['deliverables', 'd2'];
+    if (title === NEW_RISK) return ['risks', 'r6'];
+    return { TASK: ['tasks'], ISSUE: ['tasks'], DELIVERABLE: ['deliverables'], ACTIVITY: ['timeline'], RISK: ['risks'], ACTION: ['mom'] }[kind] || ['overview'];
+  };
+  const tagDays = tag => {
+    let m = tag.match(/^(\d+)D LATE$/); if (m) return -Number(m[1]);
+    m = tag.match(/^IN (\d+)D$/); if (m) return Number(m[1]);
+    return tag === 'TODAY' ? 0 : null;
+  };
+
+  function overviewModel() {
+    const rows = [...$('[data-hook="items"]', view).children].map(b => {
+      const sp = [...b.children].filter(c => c.tagName === 'SPAN');
+      const [kind, title, owner, tag] = sp.map(x => x.textContent.trim());
+      return { kind, title, owner, tag, tone: sp[3]?.classList.contains('text-qb-magenta') ? 'magenta' : 'orange' };
+    }).filter(r => r.title !== SIGNOFF);
+    const late = rows.filter(r => /LATE$/.test(r.tag));
+    const blocked = rows.filter(r => r.tag === 'BLOCKED');
+    const risks = rows.filter(r => r.kind === 'RISK' && !late.includes(r));
+    const soon = rows.filter(r => !late.includes(r) && !blocked.includes(r) && !risks.includes(r));
+    // The sign-off task, at whatever date the proposal (or the user's edit) gives it.
+    const d = dueTag(signoffDate());
+    const signoff = { kind: 'TASK', title: SIGNOFF, owner: 'Priya', tag: d.tag, tone: d.tone };
+    if (d.state === 'late') late.push(signoff); else if (d.state === 'soon') soon.push(signoff);
+    late.sort((x, y) => tagDays(x.tag) - tagDays(y.tag));
+    soon.sort((x, y) => tagDays(x.tag) - tagDays(y.tag));
+    if (S.applied.c2) risks.unshift({ kind: 'RISK', title: NEW_RISK, owner: 'Rafi', tag: 'HIGH', tone: 'magenta', fresh: !S.seen.risk });
+    return { items: [...late, ...blocked, ...risks, ...soon], late: late.length, soon: soon.length };
+  }
+
+  function stripModel() {
+    const days = [...$('[data-hook="strip"]', view).children].map((cell, n) => {
+      const iso = new Date(Date.UTC(2026, 9, 15 + n)).toISOString().slice(0, 10);
+      const due = (cell.getAttribute('title') || '').split('\n')
+        .map(l => l.match(/^(TASK|ISSUE|DELIVERABLE|ACTIVITY|ACTION|RISK): (.*)$/)).filter(Boolean)
+        .map(m => ({ kind: m[1], title: m[2] }))
+        .filter(x => !(x.kind === 'TASK' && x.title === SIGNOFF));
+      return { iso, due };
+    });
+    const day = days.find(x => x.iso === signoffDate());
+    if (day) day.due.unshift({ kind: 'TASK', title: SIGNOFF });
+    return days;
   }
 
   function paintOverview() {
-    const ov = overviewItems();
-    // Schedule: weighted progress of the sample timeline (39.4 of 90 weight done; +1 when migration moves to 55%)
-    const actual = (39.4 + (S.applied.c4 ? 1 : 0)) / 90, planned = 0.4845;
-    const gap = Math.round((actual - planned) * 100);
-    const tone = gap <= -5 ? 'magenta' : gap < 0 ? 'orange' : 'green';
-    const tile = $('[data-kpi="schedule"]', view);
-    const a = $('[data-v="actual"]', tile);
-    a.textContent = `${Math.round(actual * 100)}%`;
-    a.classList.remove('text-qb-magenta', 'text-qb-orange', 'text-qb-green'); a.classList.add(`text-qb-${tone}`);
-    const g = $('[data-v="gap"]', tile);
-    g.textContent = gap === 0 ? 'ON PLAN' : `${Math.abs(gap)} PT${Math.abs(gap) === 1 ? '' : 'S'} ${gap > 0 ? 'AHEAD' : 'BEHIND'}`;
-    g.classList.remove('text-qb-magenta', 'text-qb-orange', 'text-qb-green'); g.classList.add(`text-qb-${tone}`);
-    Object.assign($('[data-v="bar"]', tile).style, { width: `${actual * 100}%`, background: `var(--color-qb-${tone})` });
-    Object.assign($('[data-v="dot"]', tile).style, { top: `${((56 - 4 - actual * 48) / 56) * 100}%`, background: `var(--color-qb-${tone})` });
+    // Schedule tile and Build row: the captured screen, or the one captured
+    // after the migration line was signed off.
+    if (S.applied.c4) {
+      const alt = document.createElement('div');
+      alt.innerHTML = tpl('overview_s4');
+      ['[data-kpi="schedule"]', '[data-phase="build"]'].forEach(sel => { const a = $(sel, alt), b = $(sel, view); if (a && b) b.replaceWith(a); });
+    }
+    const ov = overviewModel();
     $('[data-kpi="late"] [data-v="value"]', view).textContent = ov.late;
     $('[data-kpi="soon"] [data-v="value"]', view).textContent = ov.soon;
-    $('[data-kpi="high"] [data-v="value"]', view).textContent = 3 + (S.applied.c2 ? 1 : 0);
+    const high = $('[data-kpi="high"] [data-v="value"]', view);
+    high.textContent = Number(high.textContent) + (S.applied.c2 ? 1 : 0);
 
     const arrow = icon('arrow');
     $('[data-hook="items"]', view).innerHTML = ov.items.map(it => {
       const c = KIND_COLOR[it.kind];
-      return `<button type="button" data-h="item:${it.go.join(':')}" class="group flex items-center gap-3 py-2.5 px-3 border-b border-qb-light-grey text-left hover:bg-black/5 transition-colors${it.fresh ? ' landed' : ''}"><span class="w-[86px] shrink-0 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 text-center" style="color: ${c}; background-color: ${tint(c, 12)};">${it.kind}</span><span class="flex-1 min-w-0 truncate text-sm font-medium text-qb-dark-grey group-hover:text-qb-black">${esc(it.title)}</span><span class="hidden @min-[768px]/app:inline text-[10px] font-bold font-mono uppercase tracking-wider text-qb-dark-grey bg-black/5 px-2 py-0.5 border border-qb-light-grey max-w-[110px] truncate shrink-0">${it.owner}</span><span class="w-[118px] shrink-0 text-right text-[10px] font-black font-mono uppercase tracking-wider ${it.tone === 'magenta' ? 'text-qb-magenta' : 'text-qb-orange'}">${it.tag}</span>${arrow}</button>`;
+      return `<button type="button" data-h="item:${goFor(it.kind, it.title).join(':')}" class="group flex items-center gap-3 py-2.5 px-3 border-b border-qb-light-grey text-left hover:bg-black/5 transition-colors${it.fresh ? ' landed' : ''}"><span class="w-[86px] shrink-0 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 text-center" style="color: ${c}; background-color: ${tint(c, 12)};">${it.kind}</span><span class="flex-1 min-w-0 truncate text-sm font-medium text-qb-dark-grey group-hover:text-qb-black">${esc(it.title)}</span><span class="hidden @min-[768px]/app:inline text-[10px] font-bold font-mono uppercase tracking-wider text-qb-dark-grey bg-black/5 px-2 py-0.5 border border-qb-light-grey max-w-[110px] truncate shrink-0">${esc(it.owner)}</span><span class="w-[118px] shrink-0 text-right text-[10px] font-black font-mono uppercase tracking-wider ${it.tone === 'magenta' ? 'text-qb-magenta' : 'text-qb-orange'}">${it.tag}</span>${arrow}</button>`;
     }).join('');
     $('[data-hook="items-count"]', view).textContent = `[${ov.items.length}]`;
 
     // the next fourteen days
-    const byDay = {};
-    ov.all.filter(i => i.kind !== 'ACTIVITY' || i.state !== 'late').forEach(i => { (byDay[i.date] ||= []).push(i); });
-    byDay['2026-10-19'] = [{ kind: 'ISSUE', title: 'Vendor sandbox times out on bulk import' }];
-    let strip = '';
-    for (let n = 0; n < 14; n++) {
-      const d = new Date(Date.UTC(2026, 9, 15 + n));
-      const iso = d.toISOString().slice(0, 10);
-      const wd = d.getUTCDay(), weekend = wd === 0 || wd === 6;
-      const due = byDay[iso] || [];
+    $('[data-hook="strip"]', view).innerHTML = stripModel().map(({ iso, due }, n) => {
+      const wd = new Date(`${iso}T00:00:00Z`).getUTCDay(), weekend = wd === 0 || wd === 6;
       const title = due.length ? due.map(x => `${x.kind}: ${x.title}`).join('\n') : longDate(iso);
-      strip += `<div class="relative flex flex-col items-center gap-1 pt-1.5 pb-2 min-h-[92px] ${n > 0 ? 'border-l border-qb-light-grey' : ''} ${weekend ? 'bg-black/[0.04]' : ''} ${n === 0 ? 'bg-qb-orange/10' : ''}" title="${esc(title)}"><span class="text-[9px] font-black uppercase tracking-widest ${n === 0 ? 'text-qb-orange' : 'text-qb-grey'}">${'SMTWTFS'[wd]}</span><span class="text-[11px] font-mono font-bold ${n === 0 ? 'text-qb-orange' : 'text-qb-dark-grey'}">${d.getUTCDate()}</span><div class="flex flex-col items-center gap-[3px] mt-0.5">${due.map(x => `<span class="w-2 h-2" style="background: ${KIND_COLOR[x.kind]};"></span>`).join('')}</div></div>`;
-    }
-    $('[data-hook="strip"]', view).innerHTML = strip;
+      const moved = S.applied.c1 && due.some(x => x.title === SIGNOFF) && iso !== '2026-10-16';
+      return `<div class="relative flex flex-col items-center gap-1 pt-1.5 pb-2 min-h-[92px] ${n > 0 ? 'border-l border-qb-light-grey' : ''} ${weekend ? 'bg-black/[0.04]' : ''} ${n === 0 ? 'bg-qb-orange/10' : ''}${moved && !S.seen.signoff ? ' landed' : ''}" title="${esc(title)}"><span class="text-[9px] font-black uppercase tracking-widest ${n === 0 ? 'text-qb-orange' : 'text-qb-grey'}">${'SMTWTFS'[wd]}</span><span class="text-[11px] font-mono font-bold ${n === 0 ? 'text-qb-orange' : 'text-qb-dark-grey'}">${Number(iso.slice(8))}</span><div class="flex flex-col items-center gap-[3px] mt-0.5">${due.slice(0, 5).map(x => `<span class="w-2 h-2" style="background: ${KIND_COLOR[x.kind]};"></span>`).join('')}${due.length > 5 ? `<span class="text-[9px] font-black text-qb-grey">+${due.length - 5}</span>` : ''}</div></div>`;
+    }).join('');
 
     // the risk heat map
     const heat = { 'Critical|Low': 1, 'Critical|Moderate': 1, 'High|High': 1, 'Moderate|Moderate': 1 };
@@ -241,13 +366,8 @@
     const probs = HEAT_PROBS.map(p => `<span class="text-center text-[9px] font-black uppercase tracking-widest text-qb-grey leading-tight">${p}</span>`).join('');
     $('[data-hook="heat"]', view).innerHTML = `<div class="flex"><div class="flex flex-col justify-between pr-2 py-0.5">${rows}</div><div class="flex-1"><div class="grid gap-[2px]" style="grid-template-columns: repeat(5, minmax(0px, 1fr));">${cells}</div><div class="grid mt-1" style="grid-template-columns: repeat(5, minmax(0px, 1fr));">${probs}</div></div></div>`;
 
-    // Build phase moves with the migration progress
-    const build = $('[data-phase="build"]', view);
-    if (build && S.applied.c4) {
-      $('[data-v="pct"]', build).firstChild.nodeValue = '46% ';
-      $('[data-v="bar"]', build).style.width = '46.25%';
-    }
     if (S.applied.c2) S.seen.risk = true;
+    if (S.applied.c1) S.seen.signoff = true;
   }
 
   // ------------------------------------------------------------ record trays
@@ -473,11 +593,14 @@
     if (S.chat && !S.reviewOnly) S.attached = id;
     renderAside();
     navigate(ch.route, { tray: ch.tray || null });
-    if (!ch.tray) {
-      // No tray for a timeline row: bring the proposed row into view, inside the app only.
-      const row = $$('*', view).find(el => el.childElementCount === 0 && /Data migration scripts/i.test(el.textContent));
-      if (row) view.scrollTop += row.getBoundingClientRect().top - view.getBoundingClientRect().top - view.clientHeight / 3;
-    }
+    // No tray for a timeline row: bring the proposed row into view, inside the app only.
+    if (!ch.tray) showGanttRow(/^Extraction scripts$/i);
+  }
+  function showGanttRow(re) {
+    const row = $$('*', view).find(el => el.childElementCount === 0 && re.test(el.textContent.trim()));
+    const { sc } = ganttScroller(view);
+    if (row && sc) sc.scrollTop += row.getBoundingClientRect().top - sc.getBoundingClientRect().top - sc.clientHeight / 3;
+    return row;
   }
   function signOff() {
     const who = S.review;
@@ -490,6 +613,8 @@
     setTimeout(() => setBadge(false), RM ? 0 : 900);
     renderView();
     if (tray && trayName(tray)) openTray(tray, false); else closeTray(false);
+    // Signed off on the timeline: stay on the row that just changed.
+    if (S.route === 'timeline' && S.applied.c4 && S.ticks.c4) showGanttRow(/^Extraction scripts$/i);
     renderBar();
     if (who === 'gemini') {
       if (!S.chat) { S.chat = true; renderAside(); }
@@ -503,6 +628,8 @@
     closeReview();
     renderView();
     if (tray && trayName(tray)) openTray(tray, false); else closeTray(false);
+    // Signed off on the timeline: stay on the row that just changed.
+    if (S.route === 'timeline' && S.applied.c4 && S.ticks.c4) showGanttRow(/^Extraction scripts$/i);
     renderBar();
     if (who === 'gemini') { S.chat = true; say('model', `<p class="leading-relaxed text-qb-black my-2 text-sm">✗ Rejected: Proposed modifications have been discarded.</p>`); setOptions(['Start over', 'reset']); }
   }
@@ -554,7 +681,7 @@
       options: [RESTART],
     },
     general: {
-      html: () => LOG('executive reporting', 'concise, outcome first') + P(`${B('Atlas ERP Rollout, 15 Oct.')} 44% done against 48% planned; go-live holds at 30 Nov.`) + UL([
+      html: () => LOG('executive reporting', 'concise, outcome first') + P(`${B('Atlas ERP Rollout, 15 Oct.')} 48% done against 53% planned; go-live holds at 30 Nov.`) + UL([
         'Design is closed apart from the data mapping sign-off.',
         'Build is behind on integrations and data migration.',
         'Three high risks, one without a mitigation.',
@@ -562,10 +689,10 @@
       ]),
       options: [['Make it two lines', 'general.short'], ['Add what I need from the sponsor', 'general.sponsor']],
     },
-    'general.short': { html: () => P('44% done, 4 points behind; go-live holds at 30 Nov. Build is the gap; one high risk has no mitigation.'), options: [['Add what I need from the sponsor', 'general.sponsor'], RESTART] },
+    'general.short': { html: () => P('48% done, 5 points behind; go-live holds at 30 Nov. Build is the gap; one high risk has no mitigation.'), options: [['Add what I need from the sponsor', 'general.sponsor'], RESTART] },
     'general.sponsor': { html: () => P(`From the sponsor: ${B('backup testers for year-end')} and ${B('a decision on the payroll parallel run')} by 22 Oct.`), options: [RESTART] },
     timeline: {
-      html: () => LOG('schedule control, critical path', 'calculated, terse') + P(`One activity is past its date: ${B('Data mapping v2')}, 6 days over at 80%.`) + P(`Build is 10 points behind its plan. ${B('Integrations')} at 20% with three weeks left is the one to watch. Go-live doesn't move yet: UAT round 1 starts 2 Nov.`),
+      html: () => LOG('schedule control, critical path', 'calculated, terse') + P(`One activity is past its date: ${B('Mapping v2')}, 6 days over at 80%, and the finance review after it is already running.`) + P(`Build is 10 points behind its plan. ${B('Warehouse scanners')}, at 10% with three weeks left, is the one to watch. Go-live doesn't move yet: UAT round 1 starts 2 Nov.`),
       options: [['How much slack is left?', 'timeline.slack'], RESTART],
     },
     'timeline.slack': { html: () => P('About four working days before UAT round 1 has to slip. After that, round 2 absorbs it until 27 Nov, and then go-live is exposed.'), options: [RESTART] },
