@@ -71,7 +71,13 @@
 
 <!-- ============================================================ HERO -->
 <section id="top" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-12 sm:pt-20">
-  <h1 class="font-black uppercase text-qb-black leading-[0.98] tracking-[0.04em] text-[clamp(2.4rem,6.4vw,5.25rem)]">AI proposes.<br>You sign off.</h1>
+  <!-- The assistant, then the headline: the app's own avatar (avatar.js),
+       looking toward the cursor, as tall as the two lines of capitals
+       (1.75 x the headline's size). Above the headline on a phone. -->
+  <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-[clamp(1.25rem,2.6vw,2.25rem)]">
+    <div data-avatar-static class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden select-none shrink-0 w-14 h-14 sm:w-[clamp(4.2rem,11.2vw,9.19rem)] sm:h-[clamp(4.2rem,11.2vw,9.19rem)]" aria-hidden="true"><span class="ai-core"></span></div>
+    <h1 class="font-black uppercase text-qb-black leading-[0.98] tracking-[0.04em] text-[clamp(2.4rem,6.4vw,5.25rem)]">AI proposes.<br>You sign off.</h1>
+  </div>
   <p class="mt-6 max-w-[30ch] text-[clamp(1.4rem,2.7vw,2.1rem)] font-bold leading-snug text-qb-black">Vibe coding, for project management.</p>
   <div class="mt-6 grid lg:grid-cols-12 gap-10 lg:gap-12 items-end">
     <div class="lg:col-span-7">
@@ -302,14 +308,14 @@
         <span class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-qb-black"><span class="w-2 h-2 bg-qb-orange"></span>From Claude</span>
         <span class="block mt-2 text-[15px] leading-relaxed text-qb-black">One click in Pinokio connects the bridge to the Claude desktop app. Ask Claude about your project and it files its changes into PM Codex.</span>
       </figcaption>
-      <div class="cl-chat rounded-2xl bg-[#262624] text-[#ece9e1] px-5 sm:px-7 pt-6 pb-5 text-[15px] leading-[1.6]">
+      <div data-chat="claude" class="cl-chat flex flex-col rounded-2xl bg-[#262624] text-[#ece9e1] px-5 sm:px-7 pt-6 pb-5 text-[15px] leading-[1.6]">
         <div class="flex justify-end"><p class="max-w-[85%] rounded-2xl bg-[#3a3936] px-4 py-2.5">PM Codex, what's for today?</p></div>
-        <p class="mt-6 text-[#9c9a92]">Fetching today's task list from PM Codex.</p>
-<pre class="mt-4 rounded-2xl border border-[#3e3d39] bg-[#2b2a27] px-5 py-4 text-[13px] leading-[1.75] overflow-x-auto">[SYSTEM LOG]
+        <p data-step="type" data-think-ms="1400" class="mt-6 text-[#9c9a92]">Fetching today's task list from PM Codex.</p>
+<pre data-step="type" class="mt-4 rounded-2xl border border-[#3e3d39] bg-[#2b2a27] px-5 py-4 text-[13px] leading-[1.75] overflow-x-auto">[SYSTEM LOG]
 &gt; loading cartridge ........ 100%
 &gt; knowledge profile : project management, Atlas ERP Rollout
 &gt; personality profile: concise, proactive, brief reports</pre>
-        <div class="mt-4">
+        <div data-step="show" data-think="Using PM Codex Bridge" data-think-ms="1600" class="mt-4">
           <button type="button" class="cl-disclosure flex items-center gap-1.5 text-[#c2c0b6] hover:text-[#ece9e1]" aria-expanded="false" aria-controls="cl-tools-1">Used PM Codex Bridge <i data-icon="chevron-down" class="cl-chev w-4 h-4 transition-transform -rotate-90"></i></button>
           <div id="cl-tools-1" hidden class="mt-3 rounded-2xl border border-[#3e3d39] text-[14px]">
             <p class="px-4 py-3 text-[#9c9a92]">Loaded tools</p>
@@ -318,13 +324,14 @@
             <p class="px-4 py-3 border-t border-[#3e3d39] text-[#9c9a92] flex items-center gap-1.5">PM Codex Bridge: Propose a batch of changes <i data-icon="chevron-right" class="w-3.5 h-3.5"></i></p>
           </div>
         </div>
-        <p class="mt-4">Three items are already late, led by the <b class="font-semibold">data mapping specification</b>, still in review with finance. Yesterday's steering moved the mapping sign-off and raised a test-data risk; both are filed as one change request in PM Codex, with a note on the specification.</p>
+        <p data-step="type" data-think-ms="900" class="mt-4">Three items are already late, led by the <b class="font-semibold">data mapping specification</b>, still in review with finance. Yesterday's steering moved the mapping sign-off and raised a test-data risk; both are filed as one change request in PM Codex, with a note on the specification.</p>
+        <div class="grow" aria-hidden="true"></div>
         <div class="mt-6 rounded-[20px] border border-[#4a4945] bg-[#30302d] px-5 py-3.5 flex items-center justify-between text-[#8f8d86]" aria-hidden="true"><span>Reply</span><i data-icon="corner-down-left" class="w-5 h-5"></i></div>
       </div>
       <p class="mt-6 mb-2 text-[9px] font-black uppercase tracking-widest text-qb-grey">Then, at the top of PM Codex</p>
       <div class="border border-qb-light-grey bg-qb-bg" aria-label="The top of the PM Codex window">
         <div class="h-11 px-4 flex items-center gap-4 border-b border-qb-light-grey overflow-hidden" aria-hidden="true"><i data-icon="gemini" class="w-4 h-4 shrink-0 text-qb-grey"></i><span class="font-black text-qb-black uppercase tracking-widest text-xs flex items-center gap-2 whitespace-nowrap"><span class="w-2 h-2 bg-qb-orange"></span>Atlas ERP Rollout</span><span class="relative text-[10px] uppercase tracking-wider font-black text-qb-black whitespace-nowrap self-stretch flex items-center">Overview<span class="absolute bottom-0 left-0 w-full h-[2px] bg-qb-orange"></span></span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Timeline</span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Deliverables</span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Tasks &amp; Issues</span></div>
-        <div class="w-full flex items-center gap-3 px-4 py-2 bg-qb-orange/10 border-b border-qb-orange"><span class="shrink-0 w-2 h-2 bg-qb-orange animate-pulse"></span><span class="text-[10px] font-black uppercase tracking-widest text-qb-black">Claude has proposed 4 changes</span><span class="text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange ml-auto">Review →</span></div>
+        <div data-after="claude" class="w-full flex items-center gap-3 px-4 py-2 bg-qb-orange/10 border-b border-qb-orange"><span class="shrink-0 w-2 h-2 bg-qb-orange animate-pulse"></span><span class="text-[10px] font-black uppercase tracking-widest text-qb-black">Claude has proposed 4 changes</span><span class="text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange ml-auto">Review →</span></div>
         <div class="h-6" aria-hidden="true"></div>
       </div>
       <button type="button" data-demo="review" class="mt-4 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange">Review it in the demo <i data-icon="arrow-up" class="w-3 h-3"></i></button>
@@ -338,23 +345,23 @@
       </figcaption>
       <div class="border border-qb-light-grey bg-qb-bg">
         <div class="flex flex-row items-center px-5 border-b border-qb-light-grey py-3 gap-4">
-          <div class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden w-11 h-11 shrink-0" aria-hidden="true"><span class="ai-core"></span></div>
+          <div data-avatar-static class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden w-11 h-11 shrink-0" aria-hidden="true"><span class="ai-core"></span></div>
           <div class="flex flex-col flex-1 min-w-0 gap-1.5">
             <span class="text-qb-black font-black uppercase tracking-widest text-sm">Assistant</span>
             <span class="text-[10px] font-black text-qb-grey uppercase tracking-widest flex items-center gap-1.5 truncate"><i data-icon="message-square" class="w-3 h-3"></i>Open friction &amp; task prioritization</span>
           </div>
         </div>
-        <div class="p-5 flex flex-col gap-5">
+        <div data-chat="gemini" class="p-5 flex flex-col gap-5">
           <div class="flex flex-col items-end"><div class="text-sm leading-relaxed p-4 border font-medium bg-qb-black text-white border-qb-black max-w-[85%]">What's blocking UAT?</div></div>
-          <div class="text-sm leading-relaxed p-4 border font-medium border-qb-orange text-qb-black w-full overflow-hidden">
+          <div data-step="type" data-think-ms="2000" class="text-sm leading-relaxed p-4 border font-medium border-qb-orange text-qb-black w-full overflow-hidden">
 <pre class="bg-qb-black text-qb-box-bg p-4 font-mono text-[11.5px] leading-relaxed overflow-x-auto whitespace-pre my-0 border-l-2 border-qb-orange">&gt; LOADING CARTRIDGE ........ [##########] 100%
 &gt; KNOWLEDGE PROFILE  : critical path, task triage
 &gt; PERSONALITY PROFILE: direct, sparing with words</pre>
             <p class="mt-3">Two blockers. The <b class="font-bold">vendor sandbox</b> waits on a patch, and the <b class="font-bold">mapping sign-off</b> is due tomorrow on a specification that is 6 days late. Shall I flag the sign-off?</p>
-            <div class="text-[9px] mt-2 opacity-50 flex gap-4 uppercase font-bold tracking-widest justify-between"><span>09:14 AM</span><span>gemini-3.7-flash</span></div>
+            <div data-instant class="text-[9px] mt-2 opacity-50 flex gap-4 uppercase font-bold tracking-widest justify-between"><span>09:14 AM</span><span>gemini-3.7-flash</span></div>
           </div>
-          <div class="flex flex-col items-end"><div class="text-sm leading-relaxed p-4 border font-medium bg-qb-black text-white border-qb-black max-w-[85%]">Yes, flag it</div></div>
-          <div class="border-2 border-qb-orange p-4 flex flex-col gap-3" aria-label="A change request from Gemini">
+          <div data-step="show" data-pause="900" class="flex flex-col items-end"><div class="text-sm leading-relaxed p-4 border font-medium bg-qb-black text-white border-qb-black max-w-[85%]">Yes, flag it</div></div>
+          <div data-step="show" data-think-ms="1800" class="border-2 border-qb-orange p-4 flex flex-col gap-3" aria-label="A change request from Gemini">
             <div class="text-xs font-black uppercase tracking-widest text-qb-orange flex items-center gap-2"><span class="animate-pulse flex h-2 w-2 rounded-full bg-qb-orange"></span>1 system modification(s) proposed</div>
             <div class="flex gap-2 mt-1" aria-hidden="true">
               <span class="flex-1 bg-qb-black text-white flex items-center justify-center gap-2 text-xs font-bold tracking-widest py-2 border border-qb-black"><i data-icon="check" class="w-3 h-3"></i> APPROVE</span>
@@ -627,6 +634,16 @@
   window.addEventListener('scroll', spy, { passive: true });
   spy();
 })();
+</script>
+<script>
+/* @avatar-js */
+</script>
+<script>
+// The assistant beside the headline and in the "From Gemini" figure.
+document.querySelectorAll('[data-avatar-static]').forEach(el => { el._pmcAvatar = window.PMCAvatar?.create(el, 'idle'); });
+</script>
+<script>
+/* @chats-js */
 </script>
 <script>
 /* @demo-js */

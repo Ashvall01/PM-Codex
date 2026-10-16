@@ -6,7 +6,9 @@
 //    in index.src.html.
 // 2. Every <i data-icon="name" class="..."></i> becomes the inline Lucide SVG
 //    the app uses (lucide-static, same version as the app's lucide-react).
-// 3. The app's captured screens (captures/) and the demo script (demo.js) are
+// 3. avatar.js — the app's animated assistant avatar — is bundled with three by
+//    esbuild and inlined.
+// 4. The app's captured screens (captures/) and the demo script (demo.js) are
 //    inlined, and so is the CSS, so docs/index.html is one self-contained file.
 //
 // GitHub Pages skips folders that start with "_", so this folder is never
@@ -32,6 +34,13 @@ let html = readFileSync(join(HERE, 'index.src.html'), 'utf8');
 const captures = readdirSync(join(HERE, 'captures')).filter(f => f.endsWith('.html')).sort()
   .map(f => `<template id="tpl-${f.slice(0, -5)}">${readFileSync(join(HERE, 'captures', f), 'utf8')}</template>`).join('\n');
 html = html.replace('<!-- @captures -->', () => captures);
+const { buildSync } = await import('esbuild');
+const avatar = buildSync({
+  entryPoints: [join(HERE, 'avatar.js')], bundle: true, minify: true, format: 'iife',
+  target: 'es2020', write: false, legalComments: 'none',
+}).outputFiles[0].text;
+html = html.replace('/* @avatar-js */', () => avatar);
+html = html.replace('/* @chats-js */', () => readFileSync(join(HERE, 'chats.js'), 'utf8'));
 html = html.replace('/* @demo-js */', () => readFileSync(join(HERE, 'demo.js'), 'utf8'));
 
 // The app's own Gemini mark (source/src/components/icons/GeminiIcon.tsx).

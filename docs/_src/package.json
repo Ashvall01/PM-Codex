@@ -10,7 +10,9 @@
   "devDependencies": {
     "@tailwindcss/cli": "4.1.14",
     "@tailwindcss/typography": "0.5.19",
+    "esbuild": "0.25.10",
+    "lucide-static": "0.546.0",
     "tailwindcss": "4.1.14",
-    "lucide-static": "0.546.0"
+    "three": "0.184.0"
   }
 }

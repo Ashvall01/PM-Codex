@@ -4,6 +4,7 @@
 @import "tailwindcss" source(none);
 @source "./index.src.html";
 @source "./demo.js";
+@source "./chats.js";
 @source "./captures";
 @plugin "@tailwindcss/typography";
 
@@ -152,3 +153,19 @@ body {
   .mod-thumb { transition: none; }
   .mod-tile:hover .mod-thumb, .mod-tile:focus-within .mod-thumb { transform: scale(var(--s, 1)); }
 }
+
+/* Streaming replies (chats.js): the caret, and Claude's thinking line */
+.type-caret {
+  display: inline-block; width: 0.5em; height: 1em; margin-left: 2px;
+  vertical-align: -0.12em; background: currentColor; opacity: 0.55;
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+.cl-think {
+  color: transparent;
+  background: linear-gradient(90deg, #6f6d66 0%, #6f6d66 35%, #ece9e1 50%, #6f6d66 65%, #6f6d66 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  animation: cl-shimmer 1.6s linear infinite;
+}
+@keyframes cl-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }

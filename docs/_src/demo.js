@@ -456,7 +456,10 @@
   }
 
   // ------------------------------------------------------------ assistant pane + review panel
-  const AVATAR = () => `<div class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden select-none outline-none w-11 h-11 shrink-0${S.thinking ? ' is-thinking' : ''}" aria-hidden="true"><span class="ai-core"></span></div>`;
+  // The real avatar (avatar.js) is mounted into this slot after each render; the
+  // diamond inside is only the no-WebGL fallback.
+  const avatarState = () => (S.thinking ? 'thinking' : S.speaking ? 'responding' : 'idle');
+  const AVATAR = () => `<div data-avatar="sidebar" class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden select-none outline-none w-11 h-11 shrink-0" aria-hidden="true"><span class="ai-core"></span></div>`;
 
   function renderAside() {
     const open = S.chat || !!S.review;
@@ -474,6 +477,8 @@
     $('#ai-toggle', app).setAttribute('aria-expanded', String(open));
     const inner = $('#ai-inner', aside);
     inner.innerHTML = `<div class="w-full min-w-0 flex h-full bg-qb-bg relative">${chatShown ? chatPane() : ''}${reviewShown ? reviewPane(chatShown) : ''}</div>`;
+    const slot = $('[data-avatar="sidebar"]', inner);
+    if (slot && window.PMCAvatar) window.PMCAvatar.mount(slot, 'sidebar', avatarState());
     const msgs = $('#ai-msgs', inner);
     if (msgs && S.msgs.length) msgs.scrollTop = msgs.scrollHeight;
   }
@@ -717,22 +722,42 @@
     S.msgs.push(role === 'user' ? { role, text: content } : { role, html: content, time: clock(), fresh: true });
   }
   function setOptions(...opts) { S.options = opts; renderAside(); }
+  // Thinking (the avatar turns red), then the reply streams in while the
+  // avatar speaks; the replies and any change request come when it's done.
+  // Played in full whatever prefers-reduced-motion says, like the app.
+  let stream = null;
+  function stopReply() { respond.gen = (respond.gen || 0) + 1; clearTimeout(respond.t); stream?.cancel(); stream = null; }
   function respond(node, userText) {
+    stopReply();
+    const gen = respond.gen;
     if (userText) say('user', userText);
     S.options = []; S.thinking = true;
     renderAside();
-    setTimeout(() => {
+    respond.t = setTimeout(() => {
       S.thinking = false;
+      S.speaking = true;
       const n = NODES[node];
       say('model', n.html());
-      if (n.acr) { S.status.gemini = 'pending'; S.gcard = true; S.ticks.g1 = true; }
-      S.options = n.options;
       renderAside();
-    }, RM ? 150 : 900);
+      const done = () => {
+        if (gen !== respond.gen) return;
+        stream = null;
+        S.speaking = false;
+        if (n.acr) { S.status.gemini = 'pending'; S.gcard = true; S.ticks.g1 = true; }
+        S.options = n.options;
+        renderAside();
+      };
+      const body = [...aside.querySelectorAll('#ai-msgs .markdown-body')].pop();
+      const msgs = $('#ai-msgs', aside);
+      if (!body || !window.PMCType) { done(); return; }
+      stream = window.PMCType.typeOut(body, { onTick: () => { if (msgs) msgs.scrollTop = msgs.scrollHeight; } });
+      stream.then(done);
+    }, 2000);
   }
   function newConversation() {
+    stopReply();
     if (S.status.gemini === 'pending') { S.status.gemini = 'none'; S.gcard = false; if (S.review === 'gemini') S.review = null; }
-    Object.assign(S, { msgs: [], options: [], thinking: false, title: 'New Conversation', cat: 'All', attached: null });
+    Object.assign(S, { msgs: [], options: [], thinking: false, speaking: false, title: 'New Conversation', cat: 'All', attached: null });
     renderAside();
   }
 
@@ -818,6 +843,7 @@
 
   // ------------------------------------------------------------ outside the frame
   $('#demo-reset').addEventListener('click', () => {
+    stopReply();
     S = fresh();
     closeTray(false);
     renderBar(); renderAside(); renderView(); setBadge(false);
