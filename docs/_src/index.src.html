@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PM Codex — project management with an AI that asks first</title>
+<meta name="description" content="A free, open-source project management app that runs on your computer, keeps your data in your own Google Sheet, and works with Claude. The assistant proposes; nothing changes until you sign off.">
+<meta name="theme-color" content="#ebece7">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PM Codex — Claude proposes. You sign off.">
+<meta property="og:description" content="Project management on your own computer, with your data in your own Google Sheet. The assistant proposes; nothing changes until you sign off.">
+<meta property="og:url" content="https://ashvall01.github.io/PM-Codex/">
+<meta property="og:image" content="https://ashvall01.github.io/PM-Codex/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23ebece7'/%3E%3Crect x='4' y='4' width='8' height='8' fill='%23ff7600'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- @css -->
+</head>
+<body class="selection:bg-qb-orange selection:text-white">
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] bg-qb-orange text-white px-4 py-2 text-xs font-black uppercase tracking-widest">Skip to content</a>
+
+<!-- ============================================================ SITE NAV
+     The app's own module bar: grouped, small group labels, an orange line
+     under the section you are in. -->
+<header class="sticky top-0 z-50 h-14 border-b border-qb-light-grey bg-qb-bg/90 backdrop-blur-md">
+  <div class="mx-auto max-w-[1280px] h-full px-4 sm:px-8 lg:px-12 flex items-center justify-between gap-4">
+    <div class="relative h-full flex-1 min-w-0 overflow-hidden" data-overflow>
+      <div data-fade="left" class="pointer-events-none absolute left-0 top-0 h-full w-8 z-10 bg-gradient-to-r from-qb-bg to-transparent hidden"></div>
+      <div data-fade="right" class="pointer-events-none absolute right-0 top-0 h-full w-12 z-10 bg-gradient-to-l from-qb-bg via-qb-bg/80 to-transparent hidden items-center justify-end"><i data-icon="chevron-right" class="w-3.5 h-3.5 text-qb-orange"></i></div>
+      <nav aria-label="Sections" class="flex gap-4 overflow-x-auto no-scrollbar h-full items-stretch" data-scroller>
+        <a href="#top" class="font-black text-qb-black mr-2 uppercase tracking-widest text-sm flex items-center gap-2 hover:text-qb-orange transition-colors whitespace-nowrap shrink-0 h-full">
+          <span class="shrink-0 w-2 h-2 bg-qb-orange"></span>PM Codex
+        </a>
+        <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
+          <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/70 whitespace-nowrap">Product</span>
+          <div class="flex-1 flex items-stretch gap-4">
+            <a href="#top" data-spy="top" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Overview</a>
+            <a href="#modules" data-spy="modules" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Modules</a>
+          </div>
+        </div>
+        <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
+          <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/70 whitespace-nowrap">AI</span>
+          <div class="flex-1 flex items-stretch gap-4">
+            <a href="#assistant" data-spy="assistant" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Change requests</a>
+          </div>
+        </div>
+        <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
+          <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/70 whitespace-nowrap">Data</span>
+          <div class="flex-1 flex items-stretch gap-4">
+            <a href="#privacy" data-spy="privacy" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Privacy</a>
+          </div>
+        </div>
+        <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
+          <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/70 whitespace-nowrap">Setup</span>
+          <div class="flex-1 flex items-stretch gap-4">
+            <a href="#install" data-spy="install" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Install</a>
+          </div>
+        </div>
+      </nav>
+    </div>
+    <div class="shrink-0 flex items-center gap-4 h-full">
+      <a href="https://github.com/Ashvall01/PM-Codex" class="text-qb-grey hover:text-qb-black transition-colors" aria-label="PM Codex on GitHub"><i data-icon="github" class="w-4 h-4"></i></a>
+      <a href="https://pinokio.co/apps/github-com-ashvall01-pm-codex" class="hidden sm:flex items-center gap-2 bg-qb-orange hover:bg-qb-orange/90 text-white px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors">Install</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<section id="top" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-12 sm:pt-20">
+  <h1 class="font-black uppercase text-qb-black leading-[0.98] tracking-[0.04em] text-[clamp(2.4rem,6.4vw,5.25rem)]">Claude proposes.<br>You sign off.</h1>
+  <div class="mt-8 grid lg:grid-cols-12 gap-10 lg:gap-12 items-end">
+    <div class="lg:col-span-7">
+      <p class="max-w-[58ch] text-[17px] sm:text-lg leading-[1.7] text-qb-black">PM Codex is a project management app that runs on your own computer and keeps your data in your own Google Sheet. Claude, and the built-in Gemini assistant, read your project and propose changes. Nothing changes until you review them.</p>
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <a href="https://pinokio.co/apps/github-com-ashvall01-pm-codex" class="flex items-center gap-2 bg-qb-orange hover:bg-qb-orange/90 text-white px-5 py-3 text-xs font-black uppercase tracking-widest transition-colors"><i data-icon="download" class="w-4 h-4"></i>Install with Pinokio</a>
+        <a href="https://github.com/Ashvall01/PM-Codex" class="flex items-center gap-2 bg-qb-box-bg hover:bg-qb-light-grey text-qb-black px-5 py-3 text-xs font-black uppercase tracking-widest transition-colors"><i data-icon="github" class="w-4 h-4"></i>View the source</a>
+      </div>
+    </div>
+    <div class="lg:col-span-5 border border-qb-light-grey p-5 relative">
+      <span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange"></span>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-[11px] font-mono font-bold uppercase tracking-wider">
+      <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Runs on</dt><dd class="text-qb-black">Your Mac, localhost:7800</dd>
+      <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Data</dt><dd class="text-qb-black">Your own Google Sheet</dd>
+      <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Assistants</dt><dd class="text-qb-black">Claude, Gemini <span class="text-qb-grey">(optional)</span></dd>
+      <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Price</dt><dd class="text-qb-black">Free, GPL-3.0</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ THE DEMO
+     The module screens and record trays are the app's own markup, captured
+     from a real build with the sample project. demo.js moves between them. -->
+<section class="mt-14 sm:mt-16 px-2 sm:px-4" aria-label="Working demo">
+  <div id="demo" class="mx-auto max-w-[1680px] border border-qb-light-grey bg-qb-bg shadow-[0_40px_90px_-50px_rgba(89,108,112,0.55)] scroll-mt-20">
+    <div class="h-8 flex items-center gap-3 px-3 border-b border-qb-light-grey bg-qb-box-bg">
+      <span class="flex gap-1.5" aria-hidden="true"><span class="w-2 h-2 bg-qb-light-grey"></span><span class="w-2 h-2 bg-qb-light-grey"></span><span class="w-2 h-2 bg-qb-light-grey"></span></span>
+      <span id="demo-url" class="font-mono text-[10px] text-qb-grey bg-qb-bg px-2 py-0.5 border border-qb-light-grey truncate">localhost:7800/overview</span>
+    </div>
+
+    <div id="app" class="@container/app relative flex flex-col h-[640px] sm:h-[720px] lg:h-[min(860px,calc(100svh-7rem))] lg:min-h-[660px] w-full overflow-hidden bg-qb-bg text-qb-black font-sans selection:bg-qb-orange selection:text-white">
+      <!-- AppLayout header -->
+      <header class="flex-shrink-0 h-14 px-6 @min-[1024px]/app:px-8 flex items-center justify-between border-b border-qb-light-grey bg-transparent z-30">
+        <div class="flex items-center h-full w-full overflow-hidden">
+          <button type="button" id="ai-toggle" data-h="ai-toggle" aria-expanded="false" class="flex-shrink-0 flex items-center h-full mr-4 transition-colors duration-200 text-qb-grey hover:text-qb-black" title="Toggle Assistant"><i data-icon="gemini" class="w-5 h-5"></i></button>
+          <div class="relative h-full w-full overflow-hidden" data-overflow>
+            <div data-fade="left" class="pointer-events-none absolute left-0 top-0 h-full w-10 z-10 bg-gradient-to-r from-qb-bg to-transparent hidden"></div>
+            <div data-fade="right" class="pointer-events-none absolute right-0 top-0 h-full w-16 z-10 bg-gradient-to-l from-qb-bg via-qb-bg/80 to-transparent hidden items-center justify-end"><i data-icon="chevron-right" class="w-3.5 h-3.5 text-qb-orange"></i></div>
+            <nav id="app-nav" aria-label="Modules" class="flex gap-4 overflow-x-auto no-scrollbar h-full items-stretch relative w-full" data-scroller>
+              <span class="font-black text-qb-black mr-2 uppercase tracking-widest text-sm flex items-center gap-2 whitespace-nowrap flex-shrink-0 h-full"><span class="flex-shrink-0 w-2 h-2 bg-qb-orange"></span><span class="max-w-[200px] truncate">Atlas ERP Rollout</span></span>
+              <div class="flex flex-col h-full flex-shrink-0">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">&nbsp;</span>
+                <div class="flex-1 flex items-stretch gap-4"><button type="button" data-route="overview" data-h="route:overview" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Overview</button></div>
+              </div>
+              <div class="flex flex-col h-full flex-shrink-0 pl-4 border-l border-qb-light-grey/70">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">Plan</span>
+                <div class="flex-1 flex items-stretch gap-4">
+                  <button type="button" data-route="timeline" data-h="route:timeline" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Timeline</button>
+                  <button type="button" data-route="deliverables" data-h="route:deliverables" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Deliverables</button>
+                </div>
+              </div>
+              <div class="flex flex-col h-full flex-shrink-0 pl-4 border-l border-qb-light-grey/70">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">Track</span>
+                <div class="flex-1 flex items-stretch gap-4">
+                  <button type="button" data-route="tasks" data-h="route:tasks" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Tasks &amp; Issues</button>
+                  <button type="button" data-route="risks" data-h="route:risks" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Risks</button>
+                </div>
+              </div>
+              <div class="flex flex-col h-full flex-shrink-0 pl-4 border-l border-qb-light-grey/70">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">Meet</span>
+                <div class="flex-1 flex items-stretch gap-4"><button type="button" data-route="mom" data-h="route:mom" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">MoM</button></div>
+              </div>
+              <div class="flex flex-col h-full flex-shrink-0 pl-4 border-l border-qb-light-grey/70">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">People</span>
+                <div class="flex-1 flex items-stretch gap-4"><button type="button" data-route="stakeholders" data-h="route:stakeholders" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Stakeholders</button></div>
+              </div>
+              <div class="flex flex-col h-full flex-shrink-0 pl-4 border-l border-qb-light-grey/70">
+                <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/60 whitespace-nowrap">Records</span>
+                <div class="flex-1 flex items-stretch gap-4">
+                  <button type="button" data-route="documents" data-h="route:documents" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Documents</button>
+                  <button type="button" data-route="codex" data-h="route:codex" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Codex</button>
+                  <button type="button" data-route="billing" data-h="route:billing" class="relative text-xs uppercase tracking-wider whitespace-nowrap transition-colors duration-200 flex items-center font-normal text-qb-grey hover:text-qb-dark-grey">Billing</button>
+                </div>
+              </div>
+            </nav>
+          </div>
+        </div>
+        <div class="flex-shrink-0 ml-4 flex items-center gap-4 h-full">
+          <div class="hidden @min-[768px]/app:flex items-center gap-2"><div id="sync-badge" role="status" class="border border-qb-green px-2.5 py-1 bg-qb-green/5 flex items-center gap-1.5 uppercase font-bold tracking-widest text-[10px] text-qb-green font-sans"><i data-icon="cloud" class="w-3 h-3 text-qb-green"></i><span>SAVED</span></div></div>
+          <button type="button" class="text-qb-grey hover:text-qb-black transition-colors flex items-center justify-center" title="Settings"><i data-icon="settings" class="w-4 h-4"></i></button>
+        </div>
+      </header>
+
+      <div id="bar-slot"></div>
+
+      <div class="flex-1 flex flex-row overflow-hidden relative">
+        <aside id="ai-aside" inert aria-label="Assistant" class="flex-shrink-0 absolute @min-[1024px]/app:relative left-0 h-full z-40 overflow-hidden bg-qb-bg w-full @min-[640px]/app:w-0 -translate-x-full @min-[1024px]/app:translate-x-0 border-transparent @min-[1024px]/app:border-r-0">
+          <div id="ai-inner" class="w-full @min-[640px]/app:w-[var(--sidebar-width)] h-full flex flex-col relative"></div>
+        </aside>
+        <main id="view" class="flex-1 overflow-auto p-4 @min-[1024px]/app:p-8 h-full flex flex-col" aria-live="polite"></main>
+      </div>
+
+      <div id="tray-slot"></div>
+      <div id="toast" role="status" class="hidden absolute bottom-5 left-1/2 -translate-x-1/2 z-[70] max-w-[90%] bg-qb-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 shadow-xl text-center"></div>
+    </div>
+  </div>
+  <div class="mx-auto max-w-[1280px] px-2 sm:px-4 lg:px-8 mt-4 flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+    <p class="flex items-start gap-2 text-sm leading-relaxed text-qb-black max-w-[78ch]"><span class="mt-1.5 shrink-0 w-2 h-2 bg-qb-orange"></span><span>The app's own screens, with a sample project. Open Claude's change request, click a line to jump to the record it changes, edit the proposal, then sign off. The star at the top left opens the assistant.</span></p>
+    <button type="button" id="demo-reset" hidden class="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-dark-grey hover:text-qb-orange"><i data-icon="rotate-ccw" class="w-3.5 h-3.5"></i>Reset the demo</button>
+  </div>
+</section>
+
+<!-- ============================================================ MODULES
+     A wall of the app's real screens: each frame renders the captured module
+     (the same markup the demo uses), scaled down. Hover pans down the screen. -->
+<section id="modules" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36">
+  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Modules</h2>
+    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">10 screens, one Google Sheet</span>
+  </div>
+  <p class="mt-6 max-w-[62ch] text-[17px] leading-[1.7] text-qb-black">Everything a project manager keeps, grouped the way the app's module bar groups it. The Overview pulls the late, the blocked and the due-this-week from all of them. These are the app's own screens; each one opens in the demo above.</p>
+
+  <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+    <article class="mod-tile group relative flex flex-col min-w-0 sm:col-span-2">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="timeline_b" data-vw="1280"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Timeline</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Plan</span></div>
+      <p class="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-qb-black">A Gantt chart and an Excel-style activity sheet with formulas, <span class="font-mono text-[13px]">WORKDAY</span> and <span class="font-mono text-[13px]">NETWORKDAYS</span> included. Save a revision and compare the plan against it.</p>
+      <button type="button" data-demo="route:timeline" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="deliverables_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Deliverables</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Plan</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">What the project hands over, with owners, due dates and a definition of done. A deliverable can hold its own sub-deliverables.</p>
+      <button type="button" data-demo="route:deliverables" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="tasks_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Tasks &amp; Issues</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Track</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">Action items and issues by status or owner, with priority, flags, comments and links to the timeline. Late dates turn magenta.</p>
+      <button type="button" data-demo="route:tasks" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0 sm:col-span-2">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="risks_b" data-vw="1280"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Risks</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Track</span></div>
+      <p class="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-qb-black">A register with a heat map drawn from your own risk matrix. Grade each risk before and after mitigation, and click a cell to list what's in it.</p>
+      <button type="button" data-demo="route:risks" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="mom_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">MoM</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Meet</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">Minutes with agenda, decisions and action items you push to the tracker when you're ready. Gemini can draft them from a recording, in any language.</p>
+      <button type="button" data-demo="route:mom" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="stakeholders_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Stakeholders</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">People</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">Who matters and how much: power, interest and knowledge, with a power and interest grid, an org chart and a Venn of groups.</p>
+      <button type="button" data-demo="route:stakeholders" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="documents_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Documents</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Records</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">One register for the project's documents: type, version, status, owner and a link to the file.</p>
+      <button type="button" data-demo="route:documents" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="codex_b" data-vw="1024"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Codex</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Records</span></div>
+      <p class="mt-2 text-[15px] leading-relaxed text-qb-black">The knowledge base: folders of pages with the rules and decisions every assistant reads before it suggests anything.</p>
+      <button type="button" data-demo="route:codex" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+    <article class="mod-tile group relative flex flex-col min-w-0 sm:col-span-2">
+      <div class="mod-frame relative h-[240px] sm:h-[300px] overflow-hidden border border-qb-light-grey bg-qb-bg transition-colors group-hover:border-qb-orange group-focus-within:border-qb-orange" aria-hidden="true" inert><span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange z-10"></span><div class="mod-thumb absolute top-0 left-0" data-capture="billing_b" data-vw="1280"></div><div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-qb-bg to-transparent"></div></div>
+      <div class="mt-4 flex items-baseline justify-between gap-4"><h3 class="text-sm font-black uppercase tracking-widest text-qb-black group-hover:text-qb-orange transition-colors">Billing</h3><span class="text-[9px] font-black uppercase tracking-[0.2em] text-qb-grey">Records</span></div>
+      <p class="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-qb-black">Payment milestones with work, document and invoice status, and a quarterly projection of what's billed and what's still to come. Off until you turn it on in Settings.</p>
+      <button type="button" data-demo="route:billing" class="mt-3 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange after:absolute after:inset-0 after:content-['']">Open in the demo <i data-icon="arrow-right" class="w-3 h-3"></i></button>
+    </article>
+  </div>
+</section>
+
+<!-- ============================================================ CHANGE REQUESTS
+     Two assistants, one review: where a change request comes from (Claude in
+     its desktop app, Gemini in the app's sidebar) and the review both land in. -->
+<section id="assistant" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36">
+  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Change requests</h2>
+    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">2 assistants, 1 review</span>
+  </div>
+  <p class="mt-6 max-w-[62ch] text-[17px] leading-[1.7] text-qb-black">PM Codex works with two assistants: Claude, from the Claude desktop app, and Gemini, built into the app. Neither one writes to your project. Whatever an assistant wants to change arrives as a change request, and every line in it shows what the value was and what it becomes.</p>
+
+  <ol class="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-qb-light-grey border border-qb-light-grey">
+    <li class="bg-qb-bg p-5"><span class="text-[11px] font-mono font-bold text-qb-orange">01</span><p class="mt-3 text-sm font-black uppercase tracking-widest text-qb-black">The assistant reads</p><p class="mt-2 text-[15px] leading-relaxed text-qb-black">Either assistant sees the project the way you do: modules, records and the Codex.</p></li>
+    <li class="bg-qb-bg p-5"><span class="text-[11px] font-mono font-bold text-qb-orange">02</span><p class="mt-3 text-sm font-black uppercase tracking-widest text-qb-black">It files one request</p><p class="mt-2 text-[15px] leading-relaxed text-qb-black">Every change it wants goes into a single change request, waiting for you in the app.</p></li>
+    <li class="bg-qb-bg p-5"><span class="text-[11px] font-mono font-bold text-qb-orange">03</span><p class="mt-3 text-sm font-black uppercase tracking-widest text-qb-black">You review</p><p class="mt-2 text-[15px] leading-relaxed text-qb-black">Each line opens on the record it changes, old value above new. Edit it, or untick it to decline.</p></li>
+    <li class="bg-qb-bg p-5"><span class="text-[11px] font-mono font-bold text-qb-orange">04</span><p class="mt-3 text-sm font-black uppercase tracking-widest text-qb-black">You sign off</p><p class="mt-2 text-[15px] leading-relaxed text-qb-black">The ticked lines apply and save to your Sheet. The assistant is told what you approved and what you didn't.</p></li>
+  </ol>
+
+  <!-- Where a change request comes from -->
+  <div class="mt-14 grid lg:grid-cols-2 gap-x-8 gap-y-14 items-start">
+    <!-- From Claude -->
+    <figure class="min-w-0 flex flex-col">
+      <figcaption class="mb-4">
+        <span class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-qb-black"><span class="w-2 h-2 bg-qb-orange"></span>From Claude</span>
+        <span class="block mt-2 text-[15px] leading-relaxed text-qb-black">One click in Pinokio connects the bridge to the Claude desktop app. Ask Claude about your project and it files its changes into PM Codex.</span>
+      </figcaption>
+      <div class="cl-chat rounded-2xl bg-[#262624] text-[#ece9e1] px-5 sm:px-7 pt-6 pb-5 text-[15px] leading-[1.6]">
+        <div class="flex justify-end"><p class="max-w-[85%] rounded-2xl bg-[#3a3936] px-4 py-2.5">PM Codex, what's for today?</p></div>
+        <p class="mt-6 text-[#9c9a92]">Fetching today's task list from PM Codex.</p>
+<pre class="mt-4 rounded-2xl border border-[#3e3d39] bg-[#2b2a27] px-5 py-4 text-[13px] leading-[1.75] overflow-x-auto">[SYSTEM LOG]
+&gt; loading cartridge ........ 100%
+&gt; knowledge profile : project management, Atlas ERP Rollout
+&gt; personality profile: concise, proactive, brief reports</pre>
+        <div class="mt-4">
+          <button type="button" class="cl-disclosure flex items-center gap-1.5 text-[#c2c0b6] hover:text-[#ece9e1]" aria-expanded="false" aria-controls="cl-tools-1">Used PM Codex Bridge <i data-icon="chevron-down" class="cl-chev w-4 h-4 transition-transform -rotate-90"></i></button>
+          <div id="cl-tools-1" hidden class="mt-3 rounded-2xl border border-[#3e3d39] text-[14px]">
+            <p class="px-4 py-3 text-[#9c9a92]">Loaded tools</p>
+            <p class="px-4 py-3 border-t border-[#3e3d39] text-[#9c9a92] flex items-center gap-1.5">PM Codex Bridge: Start a PM Codex session <i data-icon="chevron-right" class="w-3.5 h-3.5"></i></p>
+            <p class="px-4 py-3 border-t border-[#3e3d39] text-[#9c9a92] flex items-center gap-1.5">PM Codex Bridge: Read one module of the project in full <i data-icon="chevron-right" class="w-3.5 h-3.5"></i></p>
+            <p class="px-4 py-3 border-t border-[#3e3d39] text-[#9c9a92] flex items-center gap-1.5">PM Codex Bridge: Propose a batch of changes <i data-icon="chevron-right" class="w-3.5 h-3.5"></i></p>
+          </div>
+        </div>
+        <p class="mt-4">Three items are already late, led by the <b class="font-semibold">data mapping specification</b>, still in review with finance. Yesterday's steering moved the mapping sign-off and raised a test-data risk; both are filed as one change request in PM Codex, with a note on the specification.</p>
+        <div class="mt-6 rounded-[20px] border border-[#4a4945] bg-[#30302d] px-5 py-3.5 flex items-center justify-between text-[#8f8d86]" aria-hidden="true"><span>Reply</span><i data-icon="corner-down-left" class="w-5 h-5"></i></div>
+      </div>
+      <p class="mt-6 mb-2 text-[9px] font-black uppercase tracking-widest text-qb-grey">Then, at the top of PM Codex</p>
+      <div class="border border-qb-light-grey bg-qb-bg" aria-label="The top of the PM Codex window">
+        <div class="h-11 px-4 flex items-center gap-4 border-b border-qb-light-grey overflow-hidden" aria-hidden="true"><i data-icon="gemini" class="w-4 h-4 shrink-0 text-qb-grey"></i><span class="font-black text-qb-black uppercase tracking-widest text-xs flex items-center gap-2 whitespace-nowrap"><span class="w-2 h-2 bg-qb-orange"></span>Atlas ERP Rollout</span><span class="relative text-[10px] uppercase tracking-wider font-black text-qb-black whitespace-nowrap self-stretch flex items-center">Overview<span class="absolute bottom-0 left-0 w-full h-[2px] bg-qb-orange"></span></span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Timeline</span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Deliverables</span><span class="text-[10px] uppercase tracking-wider text-qb-grey whitespace-nowrap">Tasks &amp; Issues</span></div>
+        <div class="w-full flex items-center gap-3 px-4 py-2 bg-qb-orange/10 border-b border-qb-orange"><span class="shrink-0 w-2 h-2 bg-qb-orange animate-pulse"></span><span class="text-[10px] font-black uppercase tracking-widest text-qb-black">Claude has proposed 4 changes</span><span class="text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange ml-auto">Review →</span></div>
+        <div class="h-6" aria-hidden="true"></div>
+      </div>
+      <button type="button" data-demo="review" class="mt-4 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange">Review it in the demo <i data-icon="arrow-up" class="w-3 h-3"></i></button>
+    </figure>
+
+    <!-- From Gemini -->
+    <figure class="min-w-0 flex flex-col">
+      <figcaption class="mb-4">
+        <span class="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-qb-black"><i data-icon="gemini" class="w-3.5 h-3.5 text-qb-orange"></i>From Gemini</span>
+        <span class="block mt-2 text-[15px] leading-relaxed text-qb-black">Add a Gemini API key and the assistant opens in the app's own sidebar, with prompt templates to start from. Its changes wait in the chat.</span>
+      </figcaption>
+      <div class="border border-qb-light-grey bg-qb-bg">
+        <div class="flex flex-row items-center px-5 border-b border-qb-light-grey py-3 gap-4">
+          <div class="ai-avatar relative bg-radial-[circle_at_center,_#0a1520_0%,_#000000_70%] border border-[#00e5ff]/20 rounded-sm overflow-hidden w-11 h-11 shrink-0" aria-hidden="true"><span class="ai-core"></span></div>
+          <div class="flex flex-col flex-1 min-w-0 gap-1.5">
+            <span class="text-qb-black font-black uppercase tracking-widest text-sm">Assistant</span>
+            <span class="text-[10px] font-black text-qb-grey uppercase tracking-widest flex items-center gap-1.5 truncate"><i data-icon="message-square" class="w-3 h-3"></i>Open friction &amp; task prioritization</span>
+          </div>
+        </div>
+        <div class="p-5 flex flex-col gap-5">
+          <div class="flex flex-col items-end"><div class="text-sm leading-relaxed p-4 border font-medium bg-qb-black text-white border-qb-black max-w-[85%]">What's blocking UAT?</div></div>
+          <div class="text-sm leading-relaxed p-4 border font-medium border-qb-orange text-qb-black w-full overflow-hidden">
+<pre class="bg-qb-black text-qb-box-bg p-4 font-mono text-[11.5px] leading-relaxed overflow-x-auto whitespace-pre my-0 border-l-2 border-qb-orange">&gt; LOADING CARTRIDGE ........ [##########] 100%
+&gt; KNOWLEDGE PROFILE  : critical path, task triage
+&gt; PERSONALITY PROFILE: direct, sparing with words</pre>
+            <p class="mt-3">Two blockers. The <b class="font-bold">vendor sandbox</b> waits on a patch, and the <b class="font-bold">mapping sign-off</b> is due tomorrow on a specification that is 6 days late. Shall I flag the sign-off?</p>
+            <div class="text-[9px] mt-2 opacity-50 flex gap-4 uppercase font-bold tracking-widest justify-between"><span>09:14 AM</span><span>gemini-3.7-flash</span></div>
+          </div>
+          <div class="flex flex-col items-end"><div class="text-sm leading-relaxed p-4 border font-medium bg-qb-black text-white border-qb-black max-w-[85%]">Yes, flag it</div></div>
+          <div class="border-2 border-qb-orange p-4 flex flex-col gap-3" aria-label="A change request from Gemini">
+            <div class="text-xs font-black uppercase tracking-widest text-qb-orange flex items-center gap-2"><span class="animate-pulse flex h-2 w-2 rounded-full bg-qb-orange"></span>1 system modification(s) proposed</div>
+            <div class="flex gap-2 mt-1" aria-hidden="true">
+              <span class="flex-1 bg-qb-black text-white flex items-center justify-center gap-2 text-xs font-bold tracking-widest py-2 border border-qb-black"><i data-icon="check" class="w-3 h-3"></i> APPROVE</span>
+              <span class="flex-1 border border-qb-black text-qb-black flex items-center justify-center text-xs font-bold tracking-widest py-2">REVIEW</span>
+              <span class="flex-1 border border-qb-light-grey text-qb-magenta flex items-center justify-center gap-2 text-xs font-bold tracking-widest py-2"><i data-icon="x" class="w-3 h-3"></i> REJECT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" data-demo="assistant" class="mt-4 self-start inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange">Talk to it in the demo <i data-icon="arrow-up" class="w-3 h-3"></i></button>
+    </figure>
+  </div>
+
+  <!-- Both land in one review -->
+  <div class="hidden lg:block relative h-20" aria-hidden="true">
+    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 80" preserveAspectRatio="none"><path d="M25 0 V40 H75 V0 M50 40 V80" fill="none" stroke="var(--color-qb-light-grey)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-qb-bg px-3 text-[9px] font-black uppercase tracking-[0.2em] text-qb-dark-grey">One review</span>
+  </div>
+  <div class="lg:hidden flex flex-col items-center py-8" aria-hidden="true"><span class="w-px h-10 bg-qb-light-grey"></span><span class="mt-2 text-[9px] font-black uppercase tracking-[0.2em] text-qb-dark-grey">One review</span></div>
+
+  <div class="border border-qb-light-grey relative grid lg:grid-cols-12">
+    <span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange"></span>
+    <div class="lg:col-span-7 p-5 sm:p-7 lg:border-r border-b lg:border-b-0 border-qb-light-grey">
+      <p class="text-[10px] font-black uppercase tracking-widest text-qb-grey mb-4">On the record itself, whoever proposed it</p>
+      <div class="flex flex-wrap items-center gap-3 pb-4 mb-5 border-b border-qb-light-grey">
+        <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border border-qb-dark-grey/40 bg-qb-box-bg text-qb-black shrink-0">Priya</span>
+        <span class="text-lg tracking-wide font-black text-qb-black">Collect sign-off on data mapping v2</span>
+        <span class="text-[9px] font-black tracking-widest text-[#ff7600] border border-[#ff7600] px-1.5 py-0.5 uppercase bg-[#ff7600]/10 shrink-0">Proposed edit · 2 fields</span>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div><span class="block text-xs font-black text-qb-grey uppercase tracking-widest mb-2 border-b border-qb-light-grey pb-1">Est. Resolution</span>
+          <div class="flex flex-col gap-1 border-l-4 border-qb-cyan pl-3 bg-qb-cyan/5 py-2"><div class="flex items-baseline gap-2"><span class="text-[9px] font-black uppercase tracking-widest text-qb-grey shrink-0 w-7">OLD</span><span class="text-xs font-mono font-bold text-qb-grey line-through tracking-wider break-words min-w-0">16 OCT 2026</span></div><div class="flex items-baseline gap-2"><span class="text-[9px] font-black uppercase tracking-widest text-qb-orange shrink-0 w-7">NEW</span><span class="text-sm font-black text-qb-black tracking-wider break-words min-w-0">23 OCT 2026</span></div><span class="text-[9px] font-black uppercase tracking-widest text-qb-grey/70 pt-0.5">Click to edit the proposed value</span></div></div>
+        <div><span class="block text-xs font-black text-qb-grey uppercase tracking-widest mb-2 border-b border-qb-light-grey pb-1">Remarks</span>
+          <div class="flex flex-col gap-1 border-l-4 border-qb-cyan pl-3 bg-qb-cyan/5 py-2"><div class="flex items-baseline gap-2"><span class="text-[9px] font-black uppercase tracking-widest text-qb-grey shrink-0 w-7">OLD</span><span class="text-xs font-mono font-bold text-qb-grey line-through tracking-wider break-words min-w-0">-- NONE --</span></div><div class="flex items-baseline gap-2"><span class="text-[9px] font-black uppercase tracking-widest text-qb-orange shrink-0 w-7">NEW</span><span class="text-sm font-black text-qb-black tracking-wider break-words min-w-0">Finance asked for one more review round.</span></div><span class="text-[9px] font-black uppercase tracking-widest text-qb-grey/70 pt-0.5">Click to edit the proposed value</span></div></div>
+      </div>
+    </div>
+    <div class="lg:col-span-5 p-5 sm:p-7 flex flex-col gap-5">
+      <div class="grid grid-cols-2 gap-px bg-qb-light-grey border border-qb-light-grey text-[10px] font-black uppercase tracking-widest">
+        <span class="bg-qb-bg px-3 py-2.5 flex items-center gap-2 text-[#51b53e]"><i data-icon="plus" class="w-3.5 h-3.5"></i>Proposed new</span>
+        <span class="bg-qb-bg px-3 py-2.5 flex items-center gap-2 text-[#ff7600]"><i data-icon="pencil" class="w-3.5 h-3.5"></i>Proposed edit</span>
+        <span class="bg-qb-bg px-3 py-2.5 flex items-center gap-2 text-qb-cyan"><i data-icon="message-square" class="w-3.5 h-3.5"></i>Proposed comment</span>
+        <span class="bg-qb-bg px-3 py-2.5 flex items-center gap-2 text-qb-magenta"><i data-icon="trash-2" class="w-3.5 h-3.5"></i>Proposed removal</span>
+      </div>
+      <p class="text-[15px] leading-relaxed text-qb-black">Both assistants' requests use the same review panel and the same four marks, in every module. A line you edit before signing off stays yours: no assistant can overwrite it with a new proposal.</p>
+      <p class="text-[15px] leading-relaxed text-qb-black">They also share one standing brief: read first, ask before assuming, keep it short. Each picks a cartridge for the problem in front of it and logs it.</p>
+    </div>
+  </div>
+</section>
+
+<section id="privacy" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36">
+  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Privacy</h2>
+    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">Your machine, your Sheet</span>
+  </div>
+
+  <div class="mt-10 grid lg:grid-cols-12 gap-10 lg:gap-12">
+    <dl class="lg:col-span-7 border-t border-qb-light-grey">
+      <div class="grid sm:grid-cols-[160px_1fr] gap-x-6 gap-y-1 py-5 border-b border-qb-light-grey">
+        <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="monitor" class="w-3.5 h-3.5 text-qb-orange"></i>The app</dt>
+        <dd class="text-[15px] leading-relaxed text-qb-black">Runs on your own computer at <span class="font-mono text-[13px] text-qb-black">http://localhost:7800</span>, installed and started by Pinokio. Nothing is hosted for you.</dd>
+      </div>
+      <div class="grid sm:grid-cols-[160px_1fr] gap-x-6 gap-y-1 py-5 border-b border-qb-light-grey">
+        <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="sheet" class="w-3.5 h-3.5 text-qb-orange"></i>Your data</dt>
+        <dd class="text-[15px] leading-relaxed text-qb-black">Lives in a Google Sheet you own, through an Apps Script you deploy yourself. The Sheet keeps its own version history.</dd>
+      </div>
+      <div class="grid sm:grid-cols-[160px_1fr] gap-x-6 gap-y-1 py-5 border-b border-qb-light-grey">
+        <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="key-round" class="w-3.5 h-3.5 text-qb-orange"></i>The Gemini key</dt>
+        <dd class="text-[15px] leading-relaxed text-qb-black">Stays in the small local server that forwards Gemini calls. It never reaches the page, and the server refuses to start if a build ever carries it.</dd>
+      </div>
+      <div class="grid sm:grid-cols-[160px_1fr] gap-x-6 gap-y-1 py-5 border-b border-qb-light-grey">
+        <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="archive" class="w-3.5 h-3.5 text-qb-orange"></i>The archive</dt>
+        <dd class="text-[15px] leading-relaxed text-qb-black">Finished tasks, deliverables and risks you archive drop out of what the AI sees by default. It can still read them when it asks.</dd>
+      </div>
+    </dl>
+
+    <div class="lg:col-span-5">
+      <div class="border border-qb-light-grey p-5 relative">
+        <span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange"></span>
+        <p class="text-[10px] font-black uppercase tracking-widest text-qb-grey mb-4 flex items-center gap-2"><i data-icon="eye-off" class="w-3.5 h-3.5"></i>Privacy glossary</p>
+        <p class="text-[15px] leading-relaxed text-qb-black">List the names you'd rather keep to yourself. The app marks them as you type and swaps them for tokens before anything reaches the AI, then swaps them back in the answer.</p>
+        <div class="mt-5 border-l-2 border-qb-light-grey pl-4">
+          <p class="text-[9px] font-black uppercase tracking-widest text-qb-grey mb-1.5">On your screen</p>
+          <p class="text-base text-qb-black">Ask <mark class="pii-mark">Hana Okafor</mark> to approve the budget for <mark class="pii-mark">Kestrel Foods</mark>.</p>
+        </div>
+        <div class="mt-4 border-l-2 border-qb-orange pl-4">
+          <p class="text-[9px] font-black uppercase tracking-widest text-qb-orange mb-1.5">What the AI receives</p>
+          <p class="font-mono text-[12.5px] leading-relaxed text-qb-black">Ask [Redacted_Name_1] to approve the budget for [Redacted_Organization_1].</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ INSTALL -->
+<section id="install" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36 pb-24">
+  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Install</h2>
+    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">Mac now, Windows later</span>
+  </div>
+
+  <div class="mt-10 grid lg:grid-cols-12 gap-10 lg:gap-12">
+    <div class="lg:col-span-4">
+      <p class="text-sm font-black uppercase tracking-widest text-qb-black">What you need</p>
+      <ul class="mt-4 flex flex-col border-t border-qb-light-grey text-[15px] text-qb-black">
+        <li class="flex items-center gap-3 py-3 border-b border-qb-light-grey"><i data-icon="monitor" class="w-4 h-4 text-qb-orange shrink-0"></i>A Mac</li>
+        <li class="flex items-center gap-3 py-3 border-b border-qb-light-grey"><i data-icon="box" class="w-4 h-4 text-qb-orange shrink-0"></i><span><a href="https://pinokio.co" class="font-bold text-qb-black underline decoration-qb-light-grey hover:decoration-qb-orange">Pinokio</a>, the free app that installs and runs local apps</span></li>
+        <li class="flex items-center gap-3 py-3 border-b border-qb-light-grey"><i data-icon="sheet" class="w-4 h-4 text-qb-orange shrink-0"></i>A Google account, for your own Sheet</li>
+        <li class="flex items-center gap-3 py-3 border-b border-qb-light-grey"><i data-icon="key-round" class="w-4 h-4 text-qb-grey shrink-0"></i><span>A <a href="https://aistudio.google.com/apikey" class="font-bold text-qb-black underline decoration-qb-light-grey hover:decoration-qb-orange">Gemini API key</a> <span class="text-qb-grey">(optional)</span></span></li>
+        <li class="flex items-center gap-3 py-3 border-b border-qb-light-grey"><i data-icon="message-square" class="w-4 h-4 text-qb-grey shrink-0"></i><span>The <a href="https://claude.ai/download" class="font-bold text-qb-black underline decoration-qb-light-grey hover:decoration-qb-orange">Claude desktop app</a> <span class="text-qb-grey">(optional)</span></span></li>
+      </ul>
+    </div>
+
+    <div class="lg:col-span-8 flex flex-col gap-10">
+      <div>
+        <p class="text-sm font-black uppercase tracking-widest text-qb-black">Install and start</p>
+        <ol class="mt-4 flex flex-col gap-px bg-qb-light-grey border border-qb-light-grey">
+          <li class="bg-qb-bg p-4 sm:p-5 grid grid-cols-[2rem_1fr] gap-3">
+            <span class="text-[11px] font-mono font-bold text-qb-orange pt-0.5">01</span>
+            <div class="min-w-0">
+              <p class="text-[15px] leading-relaxed text-qb-black">Open <a href="https://pinokio.co/apps/github-com-ashvall01-pm-codex" class="font-bold text-qb-black underline decoration-qb-light-grey hover:decoration-qb-orange">PM Codex on Pinokio</a>, or in Pinokio open <b class="text-qb-black">Discover</b> and search for <b class="text-qb-black">PM Codex</b>. You can also download from this address:</p>
+              <div class="mt-3 flex items-stretch max-w-full">
+                <code class="min-w-0 truncate bg-qb-box-bg border border-qb-light-grey px-3 py-2 font-mono text-[12px] text-qb-black">https://github.com/Ashvall01/PM-Codex</code>
+                <button type="button" id="copy-url" class="shrink-0 flex items-center gap-1.5 border border-l-0 border-qb-light-grey px-3 text-[10px] font-black uppercase tracking-widest text-qb-dark-grey hover:text-qb-orange transition-colors"><i data-icon="copy" class="w-3.5 h-3.5"></i><span>Copy</span></button>
+              </div>
+            </div>
+          </li>
+          <li class="bg-qb-bg p-4 sm:p-5 grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-0.5">02</span><p class="text-[15px] leading-relaxed text-qb-black">Click <b class="text-qb-black">Install</b>.</p></li>
+          <li class="bg-qb-bg p-4 sm:p-5 grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-0.5">03</span><p class="text-[15px] leading-relaxed text-qb-black">Click <b class="text-qb-black">Start</b>. Pinokio asks for a Gemini key; leave it empty to skip Gemini.</p></li>
+          <li class="bg-qb-bg p-4 sm:p-5 grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-0.5">04</span><p class="text-[15px] leading-relaxed text-qb-black">Click <b class="text-qb-black">Open PM Codex</b>. The first time, the setup wizard walks you through making your Sheet and connecting it.</p></li>
+        </ol>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-10">
+        <div>
+          <p class="text-sm font-black uppercase tracking-widest text-qb-black">Connect to Claude</p>
+          <ol class="mt-4 flex flex-col gap-3 text-[15px] leading-relaxed text-qb-black">
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-1">01</span><span>Install the Claude desktop app.</span></li>
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-1">02</span><span>In Pinokio, PM Codex, click <b class="text-qb-black">Connect to Claude</b>, then <b class="text-qb-black">Install</b> in the window Claude shows.</span></li>
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="text-[11px] font-mono font-bold text-qb-orange pt-1">03</span><span>Keep PM Codex open. In a new Claude conversation, say <b class="text-qb-black">“Start a PM Codex session.”</b></span></li>
+          </ol>
+        </div>
+        <div class="border border-qb-light-grey p-5 relative self-start">
+          <span class="absolute top-0 right-0 w-2 h-2 bg-qb-magenta"></span>
+          <p class="text-sm font-black uppercase tracking-widest text-qb-black">Three rules</p>
+          <ol class="mt-4 flex flex-col gap-3 text-[15px] leading-relaxed text-qb-black">
+            <li class="grid grid-cols-[1.5rem_1fr] gap-2"><span class="text-[11px] font-mono font-bold text-qb-magenta pt-1">1</span><span><b class="text-qb-black">One browser tab only.</b> Each tab saves your whole Sheet, so two tabs overwrite each other.</span></li>
+            <li class="grid grid-cols-[1.5rem_1fr] gap-2"><span class="text-[11px] font-mono font-bold text-qb-magenta pt-1">2</span><span><b class="text-qb-black">Always use http://localhost:7800.</b> A different address starts an empty app.</span></li>
+            <li class="grid grid-cols-[1.5rem_1fr] gap-2"><span class="text-[11px] font-mono font-bold text-qb-magenta pt-1">3</span><span><b class="text-qb-black">Keep the Sheet's web app address private.</b> Anyone who has it can read your data.</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="border-t border-qb-light-grey">
+  <div class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 py-8 flex flex-wrap items-center justify-between gap-4">
+    <p class="flex items-center gap-2 font-black uppercase tracking-widest text-sm text-qb-black"><span class="w-2 h-2 bg-qb-orange"></span>PM Codex</p>
+    <p class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-grey">© 2026 Aldo Veraldi · Free software, <a href="https://github.com/Ashvall01/PM-Codex/blob/main/LICENSE" class="underline decoration-qb-light-grey hover:text-qb-orange">GPL-3.0-or-later</a></p>
+    <a href="https://github.com/Ashvall01/PM-Codex" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-qb-dark-grey hover:text-qb-orange transition-colors"><i data-icon="github" class="w-4 h-4"></i>Source on GitHub</a>
+  </div>
+</footer>
+
+<!-- Icons the demo draws at run time, in the sizes the app uses -->
+<template id="tpl-ico-arrow"><i data-icon="arrow-right" class="w-3.5 h-3.5 text-qb-light-grey group-hover:text-qb-orange shrink-0"></i></template>
+<template id="tpl-ico-check"><i data-icon="check" class="w-3.5 h-3.5"></i></template>
+<template id="tpl-ico-check3"><i data-icon="check" class="w-3 h-3"></i></template>
+<template id="tpl-ico-x"><i data-icon="x" class="w-3.5 h-3.5"></i></template>
+<template id="tpl-ico-x3"><i data-icon="x" class="w-3 h-3"></i></template>
+<template id="tpl-ico-x35"><i data-icon="x" class="w-3.5 h-3.5"></i></template>
+<template id="tpl-ico-x4"><i data-icon="x" class="w-4 h-4"></i></template>
+<template id="tpl-ico-x5"><i data-icon="x" class="w-5 h-5"></i></template>
+<template id="tpl-ico-msg3"><i data-icon="message-square" class="w-3 h-3"></i></template>
+<template id="tpl-ico-plus35"><i data-icon="plus" class="w-3.5 h-3.5"></i></template>
+<template id="tpl-ico-settings3"><i data-icon="settings" class="w-3 h-3"></i></template>
+<template id="tpl-ico-arrow25"><i data-icon="arrow-right" class="w-2.5 h-2.5 group-hover:translate-x-0.5 transition-transform"></i></template>
+<template id="tpl-ico-sparkles"><i data-icon="sparkles" class="w-4 h-4"></i></template>
+<template id="tpl-ico-clip"><i data-icon="paperclip" class="w-4 h-4"></i></template>
+<template id="tpl-ico-send4"><i data-icon="send" class="w-4 h-4"></i></template>
+<template id="tpl-ico-panel-close"><i data-icon="panel-left-close" class="w-4 h-4"></i></template>
+<template id="tpl-ico-panel-open"><i data-icon="panel-left-open" class="w-4 h-4"></i></template>
+<template id="tpl-ico-refresh"><i data-icon="refresh-cw" class="w-3 h-3 animate-spin text-qb-orange"></i></template>
+<template id="tpl-ico-cloud"><i data-icon="cloud" class="w-3 h-3 text-qb-green"></i></template>
+
+<!-- The app's screens, captured from a real build with the sample project -->
+<!-- @captures -->
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // Bars that scroll sideways get a fade, as in the app
+  $$('[data-overflow]').forEach(wrap => {
+    const sc = $('[data-scroller]', wrap), l = $('[data-fade="left"]', wrap), r = $('[data-fade="right"]', wrap);
+    const measure = () => {
+      l.classList.toggle('hidden', !(sc.scrollLeft > 4));
+      const more = sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 4;
+      r.classList.toggle('hidden', !more); r.classList.toggle('flex', more);
+    };
+    sc.addEventListener('scroll', measure, { passive: true });
+    new ResizeObserver(measure).observe(sc);
+    measure();
+  });
+
+  // Modules: each frame renders the app's captured screen at a window width
+  // (data-vw), scaled to fit. Built when it comes near the viewport.
+  const fit = t => {
+    // A phone gets a narrower window, so the screen stays readable at its size.
+    const f = t.parentElement, vw = window.innerWidth < 640 ? 860 : +t.dataset.vw, sc = f.clientWidth / vw, vh = f.clientHeight / sc;
+    Object.assign(t.style, { width: `${vw}px`, height: `${vh}px` });
+    t.style.setProperty('--s', sc);
+    const inner = t.firstElementChild?.firstElementChild;
+    if (inner) t.style.setProperty('--pan', `${-Math.max(0, Math.min(inner.scrollHeight - vh, vh * 0.55))}px`);
+  };
+  const build = t => {
+    const src = document.getElementById(`tpl-${t.dataset.capture}`);
+    if (!src) return;
+    t.innerHTML = `<div class="@container/app w-full h-full bg-qb-bg text-qb-black font-sans"><div class="overflow-hidden p-4 @min-[1024px]/app:p-8 h-full flex flex-col">${src.innerHTML}</div></div>`;
+    $$('[id]', t).forEach(n => n.removeAttribute('id'));
+    $$('a, button, input, select, textarea, [tabindex]', t).forEach(n => n.setAttribute('tabindex', '-1'));
+    fit(t);
+  };
+  const thumbs = $$('.mod-thumb');
+  const near = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { near.unobserve(e.target); build(e.target); } }), { rootMargin: '600px 0px' });
+  thumbs.forEach(t => near.observe(t));
+  window.addEventListener('resize', () => thumbs.forEach(t => { if (t.firstElementChild) fit(t); }), { passive: true });
+
+  // The Claude conversation's tool lists open and close
+  $$('.cl-disclosure').forEach(b => b.addEventListener('click', () => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    document.getElementById(b.getAttribute('aria-controls')).hidden = !open;
+    $('.cl-chev', b).classList.toggle('-rotate-90', !open);
+  }));
+
+  // Copy the install address
+  $('#copy-url')?.addEventListener('click', async e => {
+    const label = e.currentTarget.querySelector('span');
+    try { await navigator.clipboard.writeText('https://github.com/Ashvall01/PM-Codex'); label.textContent = 'Copied'; }
+    catch { label.textContent = 'Select and copy'; }
+    setTimeout(() => { label.textContent = 'Copy'; }, 2000);
+  });
+
+  // Site nav: underline the section you're in
+  const spyLinks = $$('[data-spy]');
+  const mark = id => spyLinks.forEach(a => {
+    const on = a.dataset.spy === id;
+    a.classList.toggle('font-black', on); a.classList.toggle('text-qb-black', on); a.classList.toggle('text-qb-grey', !on);
+    a.querySelector('.spy-line')?.remove();
+    if (on) { a.insertAdjacentHTML('afterbegin', '<span class="spy-line absolute bottom-0 left-0 w-full h-[2px] bg-qb-orange"></span>'); a.setAttribute('aria-current', 'true'); }
+    else a.removeAttribute('aria-current');
+  });
+  const sections = spyLinks.map(a => document.getElementById(a.dataset.spy)).filter((s, i, arr) => s && arr.indexOf(s) === i);
+  const spy = () => {
+    const y = window.scrollY + window.innerHeight * 0.35;
+    let current = 'top';
+    sections.forEach(s => { if (s.offsetTop <= y) current = s.id; });
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 4) current = sections[sections.length - 1].id;
+    mark(current);
+  };
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+<script>
+/* @demo-js */
+</script>
+</body>
+</html>

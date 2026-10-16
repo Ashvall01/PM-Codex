@@ -1,0 +1,154 @@
+/* PM Codex showcase — styles.
+   The theme block is the app's own (source/src/index.css), so every class in
+   index.src.html means exactly what it means in the app. */
+@import "tailwindcss" source(none);
+@source "./index.src.html";
+@source "./demo.js";
+@source "./captures";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Raleway", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-qb-bg: #ebece7;
+  --color-qb-black: #596c70;
+  --color-qb-dark-grey: #657b80;
+  --color-qb-grey: #8c9699;
+  --color-qb-light-grey: #d1d5db;
+  --color-qb-box-bg: #e3e4e0;
+  --color-qb-orange: #ff7600;
+  --color-qb-magenta: #c11c4d;
+  --color-qb-cyan: #2dbcd2;
+  --color-qb-green: #51b53e;
+}
+
+:root { color-scheme: light; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; }
+
+body {
+  background-color: var(--color-qb-bg);
+  color: var(--color-qb-black);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The app's scrollbars */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-qb-light-grey); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-qb-grey); }
+
+/* Keyboard focus: one look everywhere */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-qb-orange);
+  outline-offset: 2px;
+}
+
+/* The privacy glossary's mark, as the app paints it (::highlight(pii-highlight)) */
+.pii-mark {
+  background-color: rgba(106, 82, 156, 0.2);
+  color: var(--color-qb-magenta);
+  font-weight: 700;
+}
+
+/* ---- From the app's source/src/index.css: rich text, one look ---- */
+.qb-prose {
+  --tw-prose-body: var(--color-qb-black);
+  --tw-prose-headings: var(--color-qb-black);
+  --tw-prose-lead: var(--color-qb-dark-grey);
+  --tw-prose-links: var(--color-qb-orange);
+  --tw-prose-bold: var(--color-qb-black);
+  --tw-prose-counters: var(--color-qb-grey);
+  --tw-prose-bullets: var(--color-qb-orange);
+  --tw-prose-hr: var(--color-qb-light-grey);
+  --tw-prose-quotes: var(--color-qb-dark-grey);
+  --tw-prose-quote-borders: var(--color-qb-orange);
+  --tw-prose-captions: var(--color-qb-grey);
+  --tw-prose-kbd: var(--color-qb-black);
+  --tw-prose-code: var(--color-qb-black);
+  --tw-prose-pre-code: #ffffff;
+  --tw-prose-pre-bg: var(--color-qb-black);
+  --tw-prose-th-borders: var(--color-qb-light-grey);
+  --tw-prose-td-borders: var(--color-qb-light-grey);
+  color: var(--tw-prose-body);
+  max-width: none;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.qb-prose.qb-prose-lg { font-size: 1.0625rem; }
+.qb-prose.qb-prose-strong { font-weight: 700; }
+.qb-prose :where(p, li, td, blockquote, div, span) { line-height: inherit; }
+.qb-prose :where(h1, h2, h3, h4) { font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; }
+.qb-prose :where(h1) { font-size: 1.5em; }
+.qb-prose :where(h2) { font-size: 1.25em; }
+.qb-prose :where(h3, h4) { font-size: 1.05em; }
+.qb-prose :where(a) { font-weight: 700; }
+.qb-prose :where(code):not(:where(pre code)) { background: var(--color-qb-box-bg); padding: 0.15em 0.35em; font-size: 0.875em; }
+.prose table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; text-align: left; }
+.prose th { background-color: var(--color-qb-box-bg); color: var(--color-qb-black); font-weight: 800; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.1em; padding: 0.5rem; border: 1px solid var(--color-qb-light-grey); }
+.prose td { padding: 0.5rem; border: 1px solid var(--color-qb-light-grey); font-size: 0.875rem; background-color: transparent; color: var(--color-qb-black); }
+.prose tr:nth-of-type(even) td { background-color: rgba(0, 0, 0, 0.02); }
+
+/* The Claude desktop conversation keeps its own system type, not the app's */
+.cl-chat { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-variant-numeric: lining-nums; }
+.cl-chat pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* The assistant's avatar. The app draws a glowing crystal with three.js; this
+   is the same picture in CSS: a cyan facet that turns, faster while thinking. */
+.ai-avatar { display: grid; place-items: center; perspective: 120px; }
+.ai-core {
+  width: 22px; height: 22px;
+  filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.85));
+  animation: ai-turn 6s linear infinite;
+}
+.ai-core::before {
+  content: ""; display: block; width: 100%; height: 100%;
+  background: linear-gradient(135deg, #b8fbff 0%, #00e5ff 38%, #0b7f9c 70%, #063a4a 100%);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.ai-avatar.is-thinking .ai-core { animation-duration: 1.4s; filter: drop-shadow(0 0 10px rgba(0, 229, 255, 1)); }
+@keyframes ai-turn {
+  0% { transform: rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateY(360deg) rotateZ(45deg); }
+}
+.animate-fade-in { animation: slot-in 0.3s ease-out 1; }
+
+/* A value that just changed, after sign-off */
+@keyframes landed {
+  0% { background-color: color-mix(in srgb, var(--color-qb-orange) 22%, transparent); }
+  100% { background-color: transparent; }
+}
+.landed { animation: landed 2.4s ease-out 1; }
+
+@keyframes slot-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.slot-in { animation: slot-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) 1; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-pulse, .animate-spin { animation: none !important; }
+  .landed, .slot-in { animation: none; }
+  .ai-core { animation: none; }
+}
+
+/* Modules: the app's screens, scaled into their frames; hover pans down the screen */
+.mod-thumb {
+  transform-origin: 0 0;
+  transform: scale(var(--s, 1));
+  transition: transform 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.mod-tile:hover .mod-thumb,
+.mod-tile:focus-within .mod-thumb { transform: scale(var(--s, 1)) translateY(var(--pan, 0px)); }
+@media (prefers-reduced-motion: reduce) {
+  .mod-thumb { transition: none; }
+  .mod-tile:hover .mod-thumb, .mod-tile:focus-within .mod-thumb { transform: scale(var(--s, 1)); }
+}

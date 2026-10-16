@@ -1,0 +1,16 @@
+{
+  "name": "pm-codex-showcase",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Builds docs/index.html, the GitHub Pages showcase. Edit index.src.html, then npm install && npm run build.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.1.14",
+    "@tailwindcss/typography": "0.5.19",
+    "tailwindcss": "4.1.14",
+    "lucide-static": "0.546.0"
+  }
+}
