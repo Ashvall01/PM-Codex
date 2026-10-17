@@ -4,7 +4,7 @@ const path = require("path")
 module.exports = {
   version: "3.7",
   title: "PM Codex",
-  description: "Project management with an AI assistant. Runs on this computer; your data stays in your own Google Sheet; works with Claude.",
+  description: "Project management with an AI assistant. Runs on this computer; your data stays in your own Google Sheet; works with Claude. Live demo: ashvall01.github.io/PM-Codex",
   icon: "icon.png",
   menu: async (kernel, info) => {
     const busy = [
