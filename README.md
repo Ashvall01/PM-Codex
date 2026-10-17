@@ -3,6 +3,8 @@
 A project management app with an AI assistant. It runs on your own computer, keeps your data in
 your own Google Sheet, and works with Claude.
 
+**[See it in action →](https://ashvall01.github.io/PM-Codex/)** A live demo of the real app with a sample project.
+
 - **Plan:** timeline with Gantt and an Excel-style activity sheet, deliverables, billing.
 - **Track:** tasks and issues, risks with a heat map, stakeholders, documents.
 - **Meetings:** minutes of meeting with action items you push to the task tracker.
