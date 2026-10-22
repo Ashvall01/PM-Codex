@@ -46,7 +46,7 @@ export function geminiErrorText(err: unknown): string {
   return raw;
 }
 
-/** True when the local server says no Gemini key is set. */
+/** True when the local server says no Gemini key is set (add it in Settings → Gemini). */
 export function isGeminiKeyMissing(err: unknown): boolean {
   const status = (err as { status?: number } | null)?.status;
   return status === 503 && /no gemini api key/i.test(geminiErrorText(err));

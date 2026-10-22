@@ -7,10 +7,12 @@ build/
 coverage/
 .test-build/
 
-# Secrets. The Gemini key lives only in Pinokio's settings (PLAN.md 22.4).
+# Secrets. The Gemini key lives only in secrets/ (saved by the app's local
+# server) or, on older installs, in Pinokio's ENVIRONMENT (PLAN.md 22.4).
 .env*
 !.env.example
 ENVIRONMENT
+secrets/
 
 # Logs and machine noise
 *.log

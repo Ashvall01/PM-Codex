@@ -14,11 +14,24 @@ import { ThinkingLevel } from '@google/genai';
  *                a frontier model and are the bulk of the token volume.
  */
 
-/** GA 2026-08-13. 1M in / 65,536 out. Function calling. $0.75 / $3.75 per 1M. */
-const GEMINI_3_7_FLASH = 'gemini-3.7-flash';
+/**
+ * The newest Flash (stable since 2026-09-02). 1M in / 65,536 out. Text, image,
+ * video, audio and PDF in. Function calling. Thinking levels low | medium |
+ * high (default medium; 'minimal' is an error).
+ *
+ * Moved here 22 Oct 2026 from:
+ *   - gemini-3.7-flash — deprecated 2026-10-08; Google routes it to 3.8 anyway.
+ *   - gemini-2.5-flash — since 2026-09-18 only accounts that used it before
+ *     can call it, so new public users got errors on titles, meeting
+ *     structuring and transcription.
+ */
+const GEMINI_3_8_FLASH = 'gemini-3.8-flash';
 
-/** Ultra-fast, reliable audio transcription workhorse with permissive audio processing. */
-const GEMINI_2_5_FLASH = 'gemini-2.5-flash';
+/**
+ * Stable, not deprecated, open to new accounts. Used only as the second try
+ * when a meeting call is blocked or keeps failing on the main model.
+ */
+const GEMINI_3_6_FLASH = 'gemini-3.6-flash';
 
 /**
  * Preview model. Google shut down its predecessor `gemini-3-pro-preview` on
@@ -31,21 +44,24 @@ export const MODELS = {
   /**
    * Agentic sidebar, cross-module analysis, anything proposing state changes.
    *
-   * EXPERIMENT (started 2026-08-15): running the agentic loop on Flash instead
-   * of Pro-preview. Rationale: 3.7 Flash is GA rather than preview, two
-   * generations newer, same 1M context, and is positioned as the agentic/coding
-   * workhorse. If tool selection and multi-step reasoning hold up across the
+   * EXPERIMENT (started 2026-08-15 on 3.7 Flash, now 3.8 Flash): running the
+   * agentic loop on Flash instead of Pro-preview. Rationale: Flash is GA rather
+   * than preview, newer, same 1M context, and is positioned as the
+   * agentic/coding workhorse. If tool selection and multi-step reasoning hold up across the
    * 30-tool surface, this is a large cost reduction.
    *
    * TO ROLL BACK: change this to GEMINI_3_1_PRO_PREVIEW. Nothing else moves.
    */
-  REASONING: GEMINI_3_7_FLASH,
+  REASONING: GEMINI_3_8_FLASH,
 
-  /** Mechanical extraction and formatting: chat titles, meeting iteration. */
-  FAST: GEMINI_2_5_FLASH,
+  /** Mechanical extraction and formatting: chat titles, meeting iteration. Thinking LOW. */
+  FAST: GEMINI_3_8_FLASH,
 
-  /** Audio speech transcription engine. */
-  TRANSCRIPTION: GEMINI_2_5_FLASH,
+  /** Audio speech transcription engine. Thinking LOW, so thinking does not eat the output limit. */
+  TRANSCRIPTION: GEMINI_3_8_FLASH,
+
+  /** Second try for meeting calls (safety false positive, repeated failure). */
+  FALLBACK: GEMINI_3_6_FLASH,
 } as const;
 
 /**
@@ -59,6 +75,6 @@ export const MODELS = {
  * when a task genuinely needs analysis.
  *
  * Supported on both models above: low | medium | high.
- * ('minimal' is rejected by gemini-3.7-flash and gemini-3.1-pro-preview.)
+ * ('minimal' is rejected by gemini-3.8-flash and gemini-3.1-pro-preview.)
  */
 export const DEFAULT_THINKING_LEVEL = ThinkingLevel.LOW;

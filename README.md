@@ -27,14 +27,15 @@ your own Google Sheet, and works with Claude.
 1. In Pinokio, open **Discover**, search for **PM Codex** — or download from URL:
    `https://github.com/Ashvall01/PM-Codex`
 2. Click **Install**.
-3. Click **Start**. Pinokio asks for a Gemini key — optional. Leave it empty to skip Gemini.
+3. Click **Start**.
 4. Click **Open PM Codex**. The app opens at **http://localhost:7800**.
 
 ## Set up your data
 
 The first time, the Setup Wizard shows you what to do: make a Google Sheet, paste the script it shows
-into **Extensions → Apps Script**, deploy it as a **Web app** with access set to **Anyone**, and paste
-the web app address into the wizard.
+into **Extensions → Apps Script**, deploy it as a **Web app** with access set to **Anyone**, add your
+Gemini key if you want Gemini (optional — **Skip for now** works), and paste the web app address into
+the wizard.
 
 **Keep that address private.** Anyone who has it can read your data.
 
@@ -55,8 +56,9 @@ Approve, Review line by line, or Reject.
    each other.
 2. **Always use http://localhost:7800.** Not Pinokio's `https://…localhost` link — a different address
    starts an empty app.
-3. **Your Gemini key stays on your computer**, in Pinokio → PM Codex → Configure. Change it there,
-   then restart the app.
+3. **Your Gemini key stays on your computer.** Add, change or remove it in **Settings → Gemini**. The
+   app checks it with Google and keeps it in the app folder's `secrets/` — never in the page, your
+   Sheet or git.
 
 ## Update
 

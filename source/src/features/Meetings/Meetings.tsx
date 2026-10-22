@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { Mic, Square, Play, Pause, Upload, CheckCircle, Clock, Volume2, AlertCircle, AlertTriangle, FileText, ChevronRight, ChevronDown, ChevronUp, Check, Sparkles, RefreshCw, Trash2, Copy, Edit3, ArrowRight } from 'lucide-react';
-import { GoogleGenAI, FunctionDeclaration, Type, Content } from '@google/genai';
+import { GoogleGenAI, FunctionDeclaration, Type, Content, ThinkingLevel } from '@google/genai';
 import { MODELS } from '../../config/models';
 import { gemini, geminiErrorText } from '../../services/geminiClient';
 
@@ -1129,13 +1129,14 @@ Guidelines:
           config: {
             maxOutputTokens: 65536,
             temperature: 0.0,
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             safetySettings: MEETING_SAFETY_SETTINGS,
           },
         },
         {
           maxRetries: 3,
           initialDelayMs: 2500,
-          fallbackModel: 'gemini-2.5-flash',
+          fallbackModel: MODELS.FALLBACK,
           onRetry: (attempt, delayMs, err) => {
             const isHighDemand = err?.message?.toLowerCase().includes('high demand') || err?.status === 503;
             const detail = isHighDemand ? 'Gemini audio capacity temporary spike (503)' : (err?.message || 'Temporary service issue');
@@ -1180,13 +1181,14 @@ Guidelines:
             config: {
               maxOutputTokens: 65536,
               temperature: 0.0,
+              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
               safetySettings: MEETING_SAFETY_SETTINGS,
             },
           },
           {
             maxRetries: 3,
             initialDelayMs: 2500,
-            fallbackModel: 'gemini-2.5-flash',
+            fallbackModel: MODELS.FALLBACK,
             onRetry: (attempt, delayMs) => {
               addLog(`[RETRY] Continuation pass ${continuationPass} retry in ${(delayMs / 1000).toFixed(1)}s (Attempt ${attempt}/3)...`);
             }

@@ -22,8 +22,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Database, DollarSign, ShieldAlert, Sparkles, Eye, Grid3X3, RotateCcw, Copy, Check,
-  RefreshCcw, Trash2, EyeOff, Settings as SettingsIcon,
+  RefreshCcw, Trash2, EyeOff, Settings as SettingsIcon, KeyRound,
 } from 'lucide-react';
+import { GeminiKeyForm } from '../../components/GeminiKeyForm';
 import { useAppStore } from '../../store/appStore';
 import { useRisksStore, RiskMatrix, ImpactLevel, ProbabilityLevel, RiskValue } from '../../store/risksStore';
 import { useBillingStore } from '../../store/billingStore';
@@ -48,7 +49,7 @@ const DEFAULT_RISK_MATRIX: RiskMatrix = {
   'Catastrophic': { 'Rare': 'High', 'Low': 'High', 'Moderate': 'Highest', 'High': 'Highest', 'Almost Certain': 'Highest', 'Uncertain': 'Expert Judgment' },
 };
 
-type SectionId = 'db' | 'risk' | 'billing' | 'pii' | 'templates' | 'ai';
+type SectionId = 'db' | 'risk' | 'billing' | 'pii' | 'gemini' | 'templates' | 'ai';
 const MENU: { group: string; items: { id: SectionId; label: string; hint: string; icon: React.FC<{ className?: string }> }[] }[] = [
   { group: 'Data', items: [
     { id: 'db', label: 'Google Sheet', hint: 'Connection and saving', icon: Database },
@@ -59,6 +60,7 @@ const MENU: { group: string; items: { id: SectionId; label: string; hint: string
     { id: 'pii', label: 'Privacy glossary', hint: 'Names hidden from the assistants', icon: ShieldAlert },
   ] },
   { group: 'Assistants', items: [
+    { id: 'gemini', label: 'Gemini', hint: 'API key — optional', icon: KeyRound },
     { id: 'templates', label: 'Prompt templates', hint: 'Ready-made requests for the chat', icon: Sparkles },
     { id: 'ai', label: 'What Gemini sees', hint: 'The project summary it is sent', icon: Eye },
   ] },
@@ -248,6 +250,17 @@ const SheetSection: React.FC = () => {
   );
 };
 
+// ------------------------------------------------------------------ Gemini
+
+const GeminiSection: React.FC = () => (
+  <Section
+    title="Gemini"
+    description="Optional. A Gemini API key turns on the built-in Gemini assistant and recording analysis. Claude works without it."
+  >
+    <GeminiKeyForm />
+  </Section>
+);
+
 // ------------------------------------------------------------ Risk matrix
 
 const RiskSection: React.FC = () => {
@@ -395,6 +408,7 @@ export default function Settings() {
           {current === 'db' && <SheetSection />}
           {current === 'risk' && <RiskSection />}
           {current === 'billing' && <BillingSection />}
+          {current === 'gemini' && <GeminiSection />}
           {current === 'templates' && <PromptTemplatesTab />}
           {current === 'pii' && <PIIGlossary />}
           {current === 'ai' && <AIDebugPanel />}

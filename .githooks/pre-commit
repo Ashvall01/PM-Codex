@@ -5,10 +5,10 @@
 
 fail=0
 
-# 1. Files that must never be tracked: Pinokio's ENVIRONMENT, and any .env file
-#    except the .env.example template.
+# 1. Files that must never be tracked: Pinokio's ENVIRONMENT, anything under
+#    secrets/ (the key the app saves), and any .env file except .env.example.
 bad_files=$(git diff --cached --name-only --diff-filter=ACMR \
-  | grep -E '(^|/)(ENVIRONMENT|\.env(\..*)?)$' \
+  | grep -E '(^|/)(ENVIRONMENT|\.env(\..*)?)$|(^|/)secrets/' \
   | grep -v -E '(^|/)\.env\.example$')
 if [ -n "$bad_files" ]; then
   echo "pre-commit: refused — these files can hold secrets and must not be committed:"

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { Check, Copy, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { MOCK_GAS_SCRIPT, EXPECTED_GAS_VERSION } from '../../services/gasSyncService';
+import { GeminiKeyForm } from '../../components/GeminiKeyForm';
 
 const SetupWizard: React.FC = () => {
   const { setGasUrl } = useAppStore();
@@ -11,6 +12,7 @@ const SetupWizard: React.FC = () => {
   const [error, setError] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [showBypass, setShowBypass] = useState(false);
+  const [geminiReady, setGeminiReady] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(MOCK_GAS_SCRIPT);
@@ -98,7 +100,8 @@ const SetupWizard: React.FC = () => {
            {[
              { id: 1, label: 'DATABASE' },
              { id: 2, label: 'DEPLOY' },
-             { id: 3, label: 'CONNECT' }
+             { id: 3, label: 'GEMINI' },
+             { id: 4, label: 'CONNECT' }
            ].map((s) => (
              <div key={s.id} className="flex flex-col items-center bg-qb-bg px-4">
                <div className={`w-8 h-8 flex items-center justify-center transition-colors
@@ -164,7 +167,25 @@ const SetupWizard: React.FC = () => {
 
           {step === 3 && (
             <div className="space-y-6">
-               <h2 className="text-xl font-black uppercase tracking-widest">3. CONNECT APPLICATION</h2>
+               <h2 className="text-xl font-black uppercase tracking-widest">3. GEMINI <span className="text-qb-grey">(OPTIONAL)</span></h2>
+               <p className="text-qb-black font-medium leading-relaxed">
+                 A Gemini API key turns on the built-in Gemini assistant and recording analysis. Claude works without it — skip this step if you don’t need Gemini. You can add or change the key later in <strong className="text-qb-orange">Settings &gt; Gemini</strong>.
+               </p>
+               <GeminiKeyForm onStatus={(s) => setGeminiReady(s.configured)} />
+               <div className="pt-8 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <button onClick={() => setStep(2)} className="text-sm font-black uppercase tracking-widest text-qb-grey hover:text-qb-black transition-colors w-full sm:w-auto py-3 sm:py-0 cursor-pointer">
+                    BACK
+                  </button>
+                  <button onClick={() => setStep(4)} className="bg-qb-black text-white px-8 py-3 text-sm font-black uppercase tracking-widest hover:bg-qb-orange transition-colors w-full sm:w-auto text-center cursor-pointer">
+                    {geminiReady ? 'NEXT STEP' : 'SKIP FOR NOW'}
+                  </button>
+               </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+               <h2 className="text-xl font-black uppercase tracking-widest">4. CONNECT APPLICATION</h2>
                <p className="text-qb-black font-medium leading-relaxed">
                  After deploying, Google will provide you with a "Web app URL". Paste that URL below to connect PM Codex to your database.
                </p>
@@ -187,7 +208,7 @@ const SetupWizard: React.FC = () => {
                </div>
                <div className="pt-8 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-4">
                   <button 
-                    onClick={() => setStep(2)} 
+                    onClick={() => setStep(3)} 
                     disabled={isConnecting}
                     className="text-sm font-black uppercase tracking-widest text-qb-grey hover:text-qb-black transition-colors w-full sm:w-auto py-3 sm:py-0 cursor-pointer disabled:opacity-50"
                   >

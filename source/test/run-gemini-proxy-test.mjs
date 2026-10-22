@@ -9,6 +9,8 @@
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import os from 'node:os';
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +18,13 @@ const SERVER = path.join(HERE, '..', 'server.mjs');
 const SDK = path.join(HERE, '..', 'node_modules', '@google', 'genai', 'dist', 'web', 'index.mjs');
 const KEY = 'test-key-7f3a9c-never-leak';
 const GOOGLE = 'https://generativelanguage.googleapis.com';
+// Keys for the in-app key settings. The fake Google accepts only GOOD_KEY.
+const GOOD_KEY = 'AppSaved-good-key-0123456789-wxyz';
+const BAD_KEY = 'AppSaved-bad-key-0123456789-abcd';
+const ENV_KEY2 = 'pinokio-env-key-0123456789-envk';
+// Every server gets its own empty secrets folder, so a key saved on this
+// computer never leaks into the test.
+const tmpSecrets = () => path.join(mkdtempSync(path.join(os.tmpdir(), 'pmc-secrets-')), 'secrets');
 
 let pass = 0, fail = 0;
 const check = (name, ok, extra = '') => {
@@ -35,6 +44,11 @@ const fake = http.createServer((req, res) => {
     seen.push({ method: req.method, path: u.pathname, query: u.search, headers: req.headers, body: body.toString() });
     const json = (status, obj, extra = {}) => { res.writeHead(status, { 'content-type': 'application/json', ...extra }); res.end(JSON.stringify(obj)); };
 
+    if (u.pathname === '/v1beta/models' && req.method === 'GET') {
+      return req.headers['x-goog-api-key'] === GOOD_KEY
+        ? json(200, { models: [{ name: 'models/gemini-2.5-flash' }] })
+        : json(400, { error: { code: 400, message: 'API key not valid.' } });
+    }
     if (u.pathname.endsWith(':streamGenerateContent')) {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'access-control-allow-origin': '*' });
       const words = ['one ', 'two ', 'three'];
@@ -68,7 +82,7 @@ const fakePort = await listen(fake);
 function startServer(port, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [SERVER], {
-      env: { PATH: process.env.PATH, PM_CODEX_PORT: String(port), PM_CODEX_GEMINI_UPSTREAM: `http://127.0.0.1:${fakePort}`, ...env },
+      env: { PATH: process.env.PATH, PM_CODEX_PORT: String(port), PM_CODEX_GEMINI_UPSTREAM: `http://127.0.0.1:${fakePort}`, PM_CODEX_SECRETS_DIR: tmpSecrets(), ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
@@ -158,9 +172,61 @@ try {
   const P2 = await freePort();
   const s2 = await startServer(P2, { GEMINI_API_KEY: '' });
   const r = await new Promise((resolve) => http.request({ host: '127.0.0.1', port: P2, method: 'POST', path: '/api/gemini/v1beta/models/x:generateContent', headers: { host: `localhost:${P2}` } }, (res) => { let b = ''; res.on('data', (d) => b += d); res.on('end', () => resolve({ status: res.statusCode, body: b })); }).end());
-  check('without a key the app gets a clear 503', r.status === 503 && r.body.includes('Configure'));
-  check('without a key the server warns at start', /no GEMINI_API_KEY/.test(s2.out()));
+  check('without a key the app gets a clear 503', r.status === 503 && r.body.includes('Settings → Gemini'));
+  check('without a key the server warns at start', /no Gemini API key/.test(s2.out()));
   s2.child.kill();
+
+  console.log('Key saved in the app');
+  const P3 = await freePort();
+  const DIR3 = tmpSecrets();
+  const FILE3 = path.join(DIR3, 'gemini-api-key');
+  let s3 = await startServer(P3, { GEMINI_API_KEY: '', PM_CODEX_SECRETS_DIR: DIR3 });
+  const keyCalls = [];
+  const settings = (method, { headers = {}, body } = {}, port = P3) => new Promise((resolve, reject) => {
+    const own = { host: `localhost:${port}`, origin: `http://localhost:${port}`, 'sec-fetch-site': 'same-origin' };
+    const all = { ...own, ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...headers };
+    for (const k of Object.keys(all)) if (all[k] === undefined) delete all[k];
+    const req = http.request({ host: '127.0.0.1', port, method, path: '/api/settings/gemini-key', headers: all }, (res) => {
+      let b = ''; res.on('data', (d) => b += d);
+      res.on('end', () => { const out = { status: res.statusCode, headers: res.headers, body: b }; keyCalls.push(JSON.stringify(out)); let json = null; try { json = JSON.parse(b); } catch {} resolve({ ...out, json }); });
+    });
+    req.on('error', reject); if (body !== undefined) req.write(typeof body === 'string' ? body : JSON.stringify(body)); req.end();
+  });
+  const g0 = await settings('GET');
+  check('status: no key at first', g0.status === 200 && g0.json?.configured === false && g0.json?.source === null);
+  check('status is never cached', /no-store/.test(String(g0.headers['cache-control'])));
+  check('another site cannot save a key (Origin)', (await settings('POST', { headers: { origin: 'https://evil.example' }, body: { key: GOOD_KEY } })).status === 403);
+  check('another site cannot save a key (Sec-Fetch-Site)', (await settings('POST', { headers: { origin: undefined, 'sec-fetch-site': 'cross-site' }, body: { key: GOOD_KEY } })).status === 403);
+  check('a foreign Host cannot read the status', (await settings('GET', { headers: { host: `evil.example:${P3}` } })).status === 403);
+  check('a non-JSON post is refused', (await settings('POST', { headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ key: GOOD_KEY }) })).status === 415);
+  check('a key with spaces is refused', (await settings('POST', { body: { key: 'not a key at all, just words' } })).status === 400);
+  const bad = await settings('POST', { body: { key: BAD_KEY } });
+  check('a key Google rejects is refused with a plain sentence', bad.status === 400 && /did not accept/.test(bad.json?.error?.message || ''));
+  check('nothing is saved after the refusals', !existsSync(FILE3));
+  const before = (await settings('GET')).json;
+  check('the status is unchanged after the refusals', before?.configured === false);
+
+  const ok = await settings('POST', { body: { key: `  ${GOOD_KEY}\n` } });
+  check('a good key is saved', ok.status === 200 && ok.json?.configured === true && ok.json?.source === 'app');
+  check('the answer gives only the last four characters', ok.json?.last4 === GOOD_KEY.slice(-4) && !ok.body.includes(GOOD_KEY));
+  check('the key file holds the key, trimmed', existsSync(FILE3) && readFileSync(FILE3, 'utf8').trim() === GOOD_KEY);
+  check('the key file is owner-only (600)', existsSync(FILE3) && (statSync(FILE3).mode & 0o777) === 0o600, existsSync(FILE3) ? (statSync(FILE3).mode & 0o777).toString(8) : '');
+  check('the secrets folder is owner-only (700)', (statSync(DIR3).mode & 0o777) === 0o700, (statSync(DIR3).mode & 0o777).toString(8));
+  const nBefore = seen.length;
+  const call = await new Promise((resolve) => http.request({ host: '127.0.0.1', port: P3, method: 'POST', path: '/api/gemini/v1beta/models/x:generateContent', headers: { host: `localhost:${P3}`, 'content-type': 'application/json' } }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); }).end('{"contents":[]}'));
+  const used = seen.slice(nBefore).find((x) => x.path.endsWith(':generateContent'));
+  check('the saved key is used at once, without a restart', call === 200 && used?.headers['x-goog-api-key'] === GOOD_KEY, String(call));
+  s3.child.kill();
+
+  s3 = await startServer(P3, { GEMINI_API_KEY: ENV_KEY2, PM_CODEX_SECRETS_DIR: DIR3 });
+  const g1 = await settings('GET');
+  check('after a restart the saved key wins over Pinokio\'s', g1.json?.source === 'app' && g1.json?.last4 === GOOD_KEY.slice(-4));
+  check('another site cannot remove the key', (await settings('DELETE', { headers: { origin: 'https://evil.example' } })).status === 403 && existsSync(FILE3));
+  const del = await settings('DELETE');
+  check('Remove deletes the saved key', del.status === 200 && !existsSync(FILE3));
+  check('after Remove, Pinokio\'s key is used again', del.json?.source === 'pinokio' && del.json?.last4 === ENV_KEY2.slice(-4));
+  check('no key-settings answer ever holds a key', !keyCalls.some((c) => c.includes(GOOD_KEY) || c.includes(BAD_KEY) || c.includes(ENV_KEY2)));
+  s3.child.kill();
 } catch (e) {
   fail++; console.log('  FAIL unexpected error:', e.stack || e);
 } finally {

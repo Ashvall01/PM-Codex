@@ -2486,6 +2486,7 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
           try {
             const response = await gemini.models.generateContent({
               model: MODELS.FAST,
+              config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
               contents: `Summarize this user prompt into a short 2-4 word title for a chat thread. Provide ONLY the title text without quotes:\n\n${currentHistory[0].parts?.[0]?.text}`,
             });
             const newTitle =

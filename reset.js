@@ -1,6 +1,6 @@
 // PM Codex — reset. PLAN.md section 22.5.
 // Removes installed packages and the build, so Install starts clean.
-// Your Gemini key (ENVIRONMENT) and your data (Google Sheet) are not touched.
+// Your Gemini key (secrets/, or ENVIRONMENT on older installs) and your data (Google Sheet) are not touched.
 module.exports = {
   version: "3.7",
   run: [
