@@ -110,6 +110,9 @@ const jsonOf = (r) => { try { return JSON.parse(textOf(r)); } catch { return nul
  */
 /** What the last discardChange carried, so a test can see the bridge passed it on. */
 let lastDiscardParams = null;
+// What the tab was last asked, per operation — to prove `project`, `group`
+// and `baseline` reach it (22 Oct 2026).
+const lastParams = {};
 
 const ALLOWED = new Set(['addTask', 'updateTask', 'updateProjectRisk', 'addProjectRisk', 'updateCodexPage', 'archiveTask', 'unarchiveTask', 'editTaskComment', 'flagTask', 'unflagTask', 'archiveProjectRisk']);
 
@@ -133,6 +136,7 @@ function fakeApp(origin, { rude = false } = {}) {
     ws.on('message', (raw) => {
       const req = JSON.parse(raw.toString());
       if (typeof req.id !== 'number') return;
+      lastParams[req.op] = req.params;
       const reply = (ok, payload) =>
         ws.send(JSON.stringify(ok ? { id: req.id, ok: true, data: payload } : { id: req.id, ok: false, error: payload }));
 
@@ -172,7 +176,10 @@ function fakeApp(origin, { rude = false } = {}) {
         const schema = SCHEMAS[req.params?.module];
         return reply(true, schema || { module: req.params?.module, actions: [], fields: [], note: `No field rules recorded for module "${req.params?.module}".` });
       }
-      if (req.op === 'listProjects') return reply(true, { activeProjectId: 'p1', projects: [{ id: 'p1', name: 'Apollo Migration', isActive: true }] });
+      if (req.op === 'listProjects') return reply(true, { activeProjectId: 'p1', projects: [
+        { id: 'p1', name: 'Apollo Migration', isActive: true },
+        { id: 'p2', name: 'Borealis Upgrade', isActive: false, yourOpenProposals: 2 },
+      ] });
       if (req.op === 'readItem') return reply(true, { id: req.params.id, type: req.params.type, riskDescription: 'Vendor SLA gap', owner: '[Client_A]' });
       if (req.op === 'search') return reply(true, { query: req.params.query, totalMatches: 1, results: { risks: [{ id: 'RSK1', riskDescription: 'Vendor SLA gap' }] }, archivedTasksNotSearched: 1 });
       // The archive. Deliberately holds a record that appears in NO module
@@ -219,7 +226,7 @@ function fakeApp(origin, { rude = false } = {}) {
         return reply(true, { total: 1, shown: 1, acrs: [acr] });
       }
       if (req.op === 'capabilities') {
-        return reply(true, { acrEditGuard: true });
+        return reply(true, { acrEditGuard: true, partialSignOff: true, crossProject: true, timelineBaselines: false });
       }
       if (req.op === 'discardChange') {
         lastDiscardParams = req.params || {};
@@ -289,6 +296,9 @@ check('start_session returns the project snapshot', /Apollo Migration/.test(sess
 check('start_session reports the current screen', /risks/.test(sessionText));
 check('directive states that Claude proposes and the user decides',
   /propose/i.test(sessionText) && /nothing has changed/i.test(sessionText));
+check('start_session names the other projects in reach',
+  /OTHER PROJECTS/.test(sessionText) && /Borealis Upgrade \(id p2\) — 2 of your proposed changes still open there/.test(sessionText) &&
+  !/- Apollo Migration \(id p1\)/.test(sessionText));
 
 const item = await main.call('read_item', { items: [{ type: 'risk', id: 'RSK1' }] });
 check('read_item round-trips', /Vendor SLA gap/.test(textOf(item)));
@@ -347,6 +357,12 @@ check('bridge_status probes the deliverables archive separately',
   JSON.stringify(statusOnline?.clientSupports));
 check('bridge_status probes the guard on the user\'s edits',
   statusOnline?.clientSupports?.acrEditGuard === true,
+  JSON.stringify(statusOnline?.clientSupports));
+// One operation, three flags: `expect` names the flag that must be true, so a
+// tab that answers `capabilities` without it reads as false, not as present.
+check('bridge_status probes the 22 Oct features by their flags',
+  statusOnline?.clientSupports?.partialSignOff === true && statusOnline?.clientSupports?.crossProject === true &&
+  statusOnline?.clientSupports?.timelineBaselines === false,
   JSON.stringify(statusOnline?.clientSupports));
 check('bridge_status probes get_field_schema too',
   statusOnline?.clientSupports?.getFieldSchema === true,
@@ -496,6 +512,23 @@ check('discard_change passes the user\'s say-so through to the tab',
 check('discard_change refuses a change id that is not there',
   /No proposed change found/i.test(textOf(missingLine)));
 
+// --- 22 Oct 2026: any project, headed groups, other baselines --------------
+await main.call('read_item', { items: [{ type: 'task', id: 'TSK1' }], project: 'Borealis Upgrade' });
+check('read_item passes `project` to the tab with every item', lastParams.readItem?.project === 'Borealis Upgrade', JSON.stringify(lastParams.readItem));
+await main.call('read_item', { items: [{ type: 'task', id: 'TSK1' }] });
+check('…and sends none when none is given', !('project' in (lastParams.readItem || {})), JSON.stringify(lastParams.readItem));
+await main.call('search_project', { query: 'sla', project: 'p2' });
+check('search_project passes `project`', lastParams.search?.project === 'p2');
+await main.call('refresh_state', { project: 'p2' });
+check('refresh_state passes `project`', lastParams.getState?.project === 'p2' && !!lastParams.getState?.maxChars, JSON.stringify(lastParams.getState));
+await main.call('get_module', { module: 'deliverables', baseline: 'Initial Plan', project: 'p2' });
+check('get_module passes `baseline` and `project`', lastParams.getModule?.baseline === 'Initial Plan' && lastParams.getModule?.project === 'p2', JSON.stringify(lastParams.getModule));
+await main.call('propose_changes', { project: 'p2', changes: [{ action: 'addTask', args: { description: 'x' }, title: 'X', group: 'Follow-ups' }] });
+check('propose_changes passes `project` and each line\'s `group`',
+  lastParams.proposeChanges?.project === 'p2' && lastParams.proposeChanges?.changes?.[0]?.group === 'Follow-ups', JSON.stringify(lastParams.proposeChanges));
+await main.call('get_acr_status', { project: 'p2' });
+check('get_acr_status passes `project`', lastParams.acrStatus?.project === 'p2');
+
 // --- Phase 2: the sign-off finds its way back to Claude --------------------
 // MCP cannot interrupt a conversation, so the outcome must ride out on the
 // next tool result, whatever that result was. This is the whole reason the
@@ -516,6 +549,24 @@ check('the sign-off notice tells Claude to refresh', /refresh_state/.test(carrie
 const second = textOf(await main.call('list_projects'));
 check('a sign-off is delivered once, not on every call afterwards',
   !/SIGNED OFF A CHANGE REQUEST/i.test(second));
+
+// Part of a request signed off, the rest kept open to discuss (22 Oct 2026).
+app.signOff({
+  acrId: 'acr2',
+  status: 'pending',
+  project: 'Borealis Upgrade',
+  at: new Date().toISOString(),
+  applied: [{ title: 'Line A', action: 'updateTask', group: 'Follow-ups' }],
+  rejected: [{ title: 'Line C', action: 'deleteTask' }],
+  stillOpen: [{ id: 'chg5', title: 'Line B', action: 'updateTask', group: 'Follow-ups' }],
+});
+await sleep(200);
+const partly = textOf(await main.call('list_projects'));
+check('a partial sign-off says the rest is still open', /PART signed off, the rest still open/.test(partly), partly.slice(-900));
+check('…names the project', /in project "Borealis Upgrade"/.test(partly));
+check('…lists applied, rejected and open lines with their groups',
+  /APPLIED  — \[Follow-ups\] Line A/.test(partly) && /REJECTED — Line C/.test(partly) && /OPEN     — \[Follow-ups\] Line B \(change chg5\)/.test(partly));
+check('…and tells Claude how to revise or withdraw an open line', /discard_change/.test(partly) && /proposing again/.test(partly));
 
 // A server copy that connects AFTER the fact must not be told about it. A
 // restarted desktop app is exactly that, and on 7 Sep it replayed rejections

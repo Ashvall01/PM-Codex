@@ -290,17 +290,33 @@ function drainSignOffNotice() {
   pendingSignOffs = [];
   if (!items.length) return '';
 
+  // Since 22 Oct 2026 the user can sign off part of a request; the rest stays
+  // open for discussion. A partial sign-off arrives with status "pending" and
+  // lists what is still open.
+  const label = (c) => `${c.group ? `[${c.group}] ` : ''}${c.title}`;
   const lines = ['', '=== THE USER HAS SIGNED OFF A CHANGE REQUEST YOU PROPOSED ==='];
+  let anyOpen = false;
   for (const o of items) {
     lines.push('');
-    lines.push(`Request ${o?.acrId || '(unknown)'} — ${o?.status || 'decided'} at ${o?.at || 'an unrecorded time'}.`);
-    for (const c of o?.applied || []) lines.push(`  APPLIED  — ${c.title}${c.edited ? ' (the user edited it first)' : ''}`);
-    for (const c of o?.rejected || []) lines.push(`  REJECTED — ${c.title}`);
+    const where = o?.project ? ` in project "${o.project}"` : '';
+    const state = o?.status === 'pending' ? 'PART signed off, the rest still open' : (o?.status || 'decided');
+    lines.push(`Request ${o?.acrId || '(unknown)'}${where} — ${state} at ${o?.at || 'an unrecorded time'}.`);
+    for (const c of o?.applied || []) lines.push(`  APPLIED  — ${label(c)}${c.edited ? ' (the user edited it first)' : ''}`);
+    for (const c of o?.rejected || []) lines.push(`  REJECTED — ${label(c)}`);
+    for (const c of o?.stillOpen || []) {
+      anyOpen = true;
+      lines.push(`  OPEN     — ${label(c)} (change ${c.id})`);
+    }
   }
   lines.push('');
   lines.push('This happened after your last message, not because of the call you just made.');
   lines.push('Acknowledge it to the user. Anything marked APPLIED is now live in the project, so');
   lines.push('call refresh_state before you rely on the snapshot you already have.');
+  if (anyOpen) {
+    lines.push('Lines marked OPEN are still waiting: the user kept them back to discuss. Ask what they');
+    lines.push('want changed. Revise one by proposing again for the same record (it merges into the open');
+    lines.push('line), or withdraw it with discard_change.');
+  }
   lines.push('=== END OF SIGN-OFF NOTICE ===');
   return lines.join('\n');
 }
@@ -390,13 +406,30 @@ const CLIENT_PROBES = [
   // without it withdraws and merges over those edits with no check, so a
   // false here matters more than it looks.
   { key: 'acrEditGuard', name: 'capabilities' },
+  // Added 22 Oct 2026. An older tab answers `capabilities` without these
+  // flags, so `expect` names the flag that must be true. Without crossProject
+  // a `project` argument is ignored and the call reads the OPEN project.
+  { key: 'partialSignOff', name: 'capabilities', expect: 'partialSignOff' },
+  { key: 'crossProject', name: 'capabilities', expect: 'crossProject' },
+  { key: 'timelineBaselines', name: 'capabilities', expect: 'timelineBaselines' },
 ];
 
 /** How many records one read_item call may fetch. */
 const READ_BATCH_MAX = 25;
 
+/**
+ * Optional on every read and propose tool since 22 Oct 2026. Until then each
+ * call was about the project open in the app; the user wanted Claude able to
+ * read and author any project without switching.
+ */
+const projectParam = () =>
+  z
+    .string()
+    .optional()
+    .describe('Which project: its id or its name from list_projects. Omit for the project open in the app.');
+
 const server = new McpServer(
-  { name: 'pm-codex-bridge', version: '0.4.0' },
+  { name: 'pm-codex-bridge', version: '0.5.0' },
   {
     instructions: [
       'You are connected to PM Codex, a project management app the user runs in their browser.',
@@ -430,6 +463,16 @@ const server = new McpServer(
       'Names and organisations may appear as placeholder tokens such as [Client_A]. That is the',
       'app masking real identities before they reach you. Use the tokens as-is; the app turns them',
       'back into real names in its own interface. Never guess what a token stands for.',
+      '',
+      'Every project is in reach, not only the open one. The read tools, propose_changes,',
+      'discard_change and get_acr_status take an optional `project` (an id or a name from',
+      'list_projects). Without it they work on the project open in the app. Each project masks names',
+      'with its own glossary, so one token can mean different people in two projects: never carry a',
+      'token from one project into another project\'s proposal.',
+      '',
+      'Give related lines of a proposal the same `group` heading, so the user can review twenty lines',
+      'as a few groups. The user may approve part of a request and keep the rest open to discuss;',
+      'the sign-off notice then lists what is still OPEN.',
     ].join('\n'),
   }
 );
@@ -455,12 +498,19 @@ server.registerTool(
     // Both in one go, and both fresh. Reading the screen from a status cached
     // earlier in the process reports where the user was when this copy of the
     // server started, which may be long before they opened anything.
-    const [status, snapshot] = await Promise.all([
+    const [status, snapshot, projectList] = await Promise.all([
       send('__status__'),
       send('getState', { maxChars: roomForSnapshot }),
+      // Names only, so Claude knows what else is in reach. A tab older than
+      // this server still answers; a failure here must not cost the session.
+      send('listProjects').catch(() => null),
     ]);
     hubStatus = status;
     const screen = status.currentScreen ?? null;
+    const others = (projectList?.projects || []).filter((p) => !p.isActive);
+    const otherLines = others.length
+      ? others.map((p) => `- ${p.name} (id ${p.id})${p.yourOpenProposals ? ` — ${p.yourOpenProposals} of your proposed changes still open there` : ''}`)
+      : ['(none)'];
     return enforceCeiling([
       '=== MASTER DIRECTIVE ===',
       directive,
@@ -470,6 +520,9 @@ server.registerTool(
       '',
       '=== PROJECT SNAPSHOT ===',
       snapshot,
+      '',
+      '=== OTHER PROJECTS (pass `project` to read or propose into one) ===',
+      ...otherLines,
       '',
       '=== NOTE ===',
       'This snapshot is a summary. Use read_item to pull the full detail of anything you intend to reason about seriously, and search_project to find things by keyword. If any module above says HELD BACK, call get_module for it before you say anything about that module. You may propose changes with propose_changes, but you cannot make one — the user approves them in the app.',
@@ -496,10 +549,11 @@ server.registerTool(
         .min(1)
         .max(READ_BATCH_MAX)
         .describe(`The records to read, up to ${READ_BATCH_MAX} at a time. One entry reads one record; several entries read them all in one go.`),
+      project: projectParam(),
     },
   },
   guarded(async (args) => {
-    const items = args?.items || [];
+    const items = (args?.items || []).map((it) => (args?.project ? { ...it, project: args.project } : it));
 
     // The hub matches replies by id, so these can all be in flight at once.
     // A record that cannot be found comes back as its own error rather than
@@ -537,6 +591,7 @@ server.registerTool(
     inputSchema: {
       query: z.string().describe('Words to look for. Case-insensitive, matched as a substring.'),
       limit: z.number().int().min(1).max(100).optional().describe('Maximum results per module. Defaults to 10.'),
+      project: projectParam(),
     },
   },
   guarded((args) => callApp('search', args))
@@ -563,6 +618,7 @@ server.registerTool(
         .max(100)
         .optional()
         .describe('How many records to return. Default 25, maximum 100.'),
+      project: projectParam(),
     },
   },
   guarded(async (args) => enforceCeiling(await callApp('readArchive', args), config.snapshotBudgetChars))
@@ -590,7 +646,7 @@ server.registerTool(
   {
     title: 'List projects',
     description:
-      'Every project in the app, marking which one is active. Reads are scoped to the active project; the user switches it in the app.',
+      'Every project in the app, with its id, marking which one is open (isActive) and where you have proposed changes still open. Any read or propose tool can work on another project: pass its id or name as `project`.',
     inputSchema: {},
   },
   guarded(() => callApp('listProjects'))
@@ -601,11 +657,16 @@ server.registerTool(
   {
     title: 'Re-read the project snapshot',
     description:
-      'Pulls a fresh snapshot. Use after the user says they have changed something in the app, or when a previous read looks stale.',
-    inputSchema: {},
+      'Pulls a fresh snapshot. Use after the user says they have changed something in the app, or when a previous read looks stale. With `project`, the snapshot of another project — the same summary start_session gives for the open one.',
+    inputSchema: {
+      project: projectParam(),
+    },
   },
-  guarded(async () =>
-    enforceCeiling(await callApp('getState', { maxChars: config.snapshotBudgetChars }), config.snapshotBudgetChars)
+  guarded(async (args) =>
+    enforceCeiling(
+      await callApp('getState', { maxChars: config.snapshotBudgetChars, ...(args?.project ? { project: args.project } : {}) }),
+      config.snapshotBudgetChars
+    )
   )
 );
 
@@ -614,11 +675,16 @@ server.registerTool(
   {
     title: 'Read one module of the project in full',
     description:
-      'One whole module of the project snapshot — every record in it, at skeleton detail. Call this for any module the snapshot marks HELD BACK, before saying anything about that module. Also useful on its own when you want one module without re-reading the whole project.',
+      'One whole module of the project snapshot — every record in it, at skeleton detail. Call this for any module the snapshot marks HELD BACK, before saying anything about that module. Also useful on its own when you want one module without re-reading the whole project. For the timeline, `baseline` reads a baseline other than the active one (the snapshot names them under "Other baselines"), to compare plans.',
     inputSchema: {
       module: z
         .enum(['project', 'stakeholders', 'billing', 'timeline', 'tasks', 'deliverables', 'risks', 'documents', 'moms', 'codex'])
         .describe('Which module to read. The name is printed in the HELD BACK notice.'),
+      baseline: z
+        .string()
+        .optional()
+        .describe('Timeline only: the name or id of a baseline (revision) to read instead of the active one. Read-only — proposals change the active baseline.'),
+      project: projectParam(),
     },
   },
   guarded(async (args) =>
@@ -646,7 +712,7 @@ server.registerTool(
   {
     title: 'Propose a batch of changes',
     description:
-      'Files a batch of edits as ONE Assistant Change Request for the user to approve or reject in the app. Archiving is here too: archiveTask / archiveDeliverable / archiveProjectRisk put a record away, the matching unarchive action brings it back, and an archived record is read-only until it is restored — an update, comment, comment edit or flag aimed at one is refused. Comments and flags: editTaskComment / editDeliverableComment { id, commentId, text } change a comment already on the record (read_item gives each comment its id), and flagTask / unflagTask { id } set the flag on a task. This does NOT change the project. Nothing happens until the user signs off, and you find out on your next tool call. Read every record you intend to change first — an update carries only the fields you send, so proposing from the summary alone loses detail you never looked at. Ids may be the aliases you saw in the snapshot; they are translated here. A change aimed at a record that does not exist (deleted since you read it, or a wrong id) refuses the whole batch. While a request is pending, a new proposal for a record already in it is merged into that line — unless the user has edited the line, in which case the batch is refused and the error carries the user\'s version.',
+      'Files a batch of edits as ONE Assistant Change Request for the user to approve or reject in the app — whole, by group, or line by line; what they do not decide stays open, and you hear about each sign-off on your next tool call. Give related changes the same `group` heading. With `project`, the request is filed in that project (the user reviews it there). Archiving is here too: archiveTask / archiveDeliverable / archiveProjectRisk put a record away, the matching unarchive action brings it back, and an archived record is read-only until it is restored — an update, comment, comment edit or flag aimed at one is refused. Comments and flags: editTaskComment / editDeliverableComment { id, commentId, text } change a comment already on the record (read_item gives each comment its id), and flagTask / unflagTask { id } set the flag on a task. This does NOT change the project. Nothing happens until the user signs off, and you find out on your next tool call. Read every record you intend to change first — an update carries only the fields you send, so proposing from the summary alone loses detail you never looked at. Ids may be the aliases you saw in the snapshot; they are translated here. A change aimed at a record that does not exist (deleted since you read it, or a wrong id) refuses the whole batch. While a request is pending, a new proposal for a record already in it is merged into that line — unless the user has edited the line, in which case the batch is refused and the error carries the user\'s version.',
     inputSchema: {
       changes: z
         .array(
@@ -661,10 +727,15 @@ server.registerTool(
               .string()
               .optional()
               .describe('A short plain-language title for this one change, as the user will read it in the review list. Omit to let the app write one.'),
+            group: z
+              .string()
+              .optional()
+              .describe('A short heading shared by related changes, e.g. "MoM 22 Oct — follow-ups". The review list shows one section per heading, which the user can approve or reject as a whole. Spell it the same way on every change that belongs together; it carries over to later proposals into the same open request.'),
           })
         )
         .min(1)
         .describe('The batch. Related edits belong in one call so the user reviews them together.'),
+      project: projectParam(),
     },
   },
   guarded((args) => callApp('proposeChanges', args))
@@ -686,6 +757,7 @@ server.registerTool(
         .boolean()
         .optional()
         .describe('Only when the user has told you to throw away their own edit to this line. Without it, a line the user edited is never withdrawn.'),
+      project: projectParam(),
     },
   },
   guarded((args) => callApp('discardChange', args))
@@ -696,7 +768,7 @@ server.registerTool(
   {
     title: 'Read change requests',
     description:
-      'The Assistant Change Requests in the active project: what has been proposed, what the user approved, and what they rejected. Without an acrId you get a list, newest first, with a one-line title per proposed change. With an acrId you get that one request in full, including the arguments of every change. A line the user edited in the app is marked userEdited: its args are the user\'s version and proposedArgs is what you sent. Call this before discarding or re-proposing a change, and before telling the user what is waiting for them.',
+      'The Assistant Change Requests in a project (the open one unless you pass `project`): what has been proposed, what the user approved, and what they rejected. A request the user signed off in part is still pending: `changes` are its open lines, `decided` what is done. Without an acrId you get a list, newest first, with a one-line title per proposed change. With an acrId you get that one request in full, including the arguments of every change. A line the user edited in the app is marked userEdited: its args are the user\'s version and proposedArgs is what you sent. Call this before discarding or re-proposing a change, and before telling the user what is waiting for them.',
     inputSchema: {
       acrId: z
         .string()
@@ -707,6 +779,7 @@ server.registerTool(
         .int()
         .optional()
         .describe('How many requests to list. Default 10, maximum 50. Ignored when acrId is given.'),
+      project: projectParam(),
     },
   },
   guarded((args) => callApp('acrStatus', args))
@@ -759,8 +832,8 @@ server.registerTool(
         // `key` where two probes share an operation name, so neither is lost.
         const key = op.key || op.name;
         try {
-          await send(op.name, op.params);
-          clientSupports[key] = true;
+          const answer = await send(op.name, op.params);
+          clientSupports[key] = op.expect ? answer?.[op.expect] === true : true;
         } catch (e) {
           // "no archive for module X" is an older client answering an operation
           // it has with a module it does not, which is exactly the half-done

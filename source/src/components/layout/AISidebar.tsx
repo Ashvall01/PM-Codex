@@ -51,9 +51,11 @@ import { useMeetingsStore } from "../../store/meetingsStore";
 import { useStakeholdersStore } from "../../store/stakeholdersStore";
 import { useDocumentsStore } from "../../store/documentsStore";
 import { useBillingStore } from "../../store/billingStore";
-import { useAcrStore, takeAcrMergeRefusals } from "../../store/acrStore";
+import { useAcrStore, takeAcrMergeRefusals, ACRChange } from "../../store/acrStore";
+import { signOffAcrLines, AcrDecision } from "../../services/acrSignOff";
+import { groupAcrLines, hasNamedGroups } from "../../utils/acrGroups";
 import { useIdAliasStore } from "../../store/idAliasStore";
-import { readArchivedModule } from "../../services/aiContextEngine";
+import { readArchivedModule, readTimelineBaseline } from "../../services/aiContextEngine";
 import { buildAIContextString } from "../../hooks/useAIContextString";
 import { useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
@@ -1296,11 +1298,53 @@ const getArchivedItemsDecl: FunctionDeclaration = {
   },
 };
 
+const getTimelineBaselineDecl: FunctionDeclaration = {
+  name: "getTimelineBaseline",
+  description:
+    "Read a timeline baseline (revision) other than the one on screen. The project state lists the active baseline in full and names the others. Without `baseline` this lists every baseline with its id, creation date and row count; with it, returns that baseline's activities. Read-only: use it to compare plans, not to change them.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      baseline: {
+        type: Type.STRING,
+        description:
+          "The baseline's name or id, as listed. Omit to list the baselines.",
+      },
+    },
+  },
+};
+
 // --- END QUERY TOOLS ---
+
+/**
+ * Every proposing tool takes an optional heading for the review list (22 Oct
+ * 2026). The store lifts it out of the arguments (acrStore.takeChangeGroup),
+ * so it never reaches a record. Added here once rather than to forty
+ * declarations by hand.
+ */
+const CHANGE_GROUP_PARAM = {
+  type: Type.STRING,
+  description:
+    'A short heading that groups this change with related ones in the review list, e.g. "MoM 22 Oct — follow-ups" or "Re-plan of the SIT phase". Use the same heading, spelled the same way, for every change that belongs together.',
+};
+
+function withChangeGroup(decl: FunctionDeclaration): FunctionDeclaration {
+  const name = String(decl.name || "");
+  if (QUERY_TOOL_NAMES.includes(name) || name === "discardPendingACRChange") return decl;
+  const params: any = decl.parameters || { type: Type.OBJECT, properties: {} };
+  return {
+    ...decl,
+    parameters: {
+      ...params,
+      properties: { ...(params.properties || {}), changeGroup: CHANGE_GROUP_PARAM },
+    },
+  };
+}
 
 export const QUERY_TOOL_NAMES = [
   "readCodexPage",
   "getArchivedItems",
+  "getTimelineBaseline",
   "getTaskDetails",
   "getDeliverableDetails",
   "getTimelineRowDetails",
@@ -2665,7 +2709,8 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
                 getRiskDetailsDecl,
                 getStakeholderDetailsDecl,
                 getMomDetailsDecl,
-              ],
+                getTimelineBaselineDecl,
+              ].map(withChangeGroup),
             },
           ],
           ...(isApprovalAck
@@ -2882,6 +2927,11 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
                 responseData =
                   baseline?.activities.find((a: any) => a.id === qc.args?.id) ||
                   responseData;
+              } else if (qc.name === "getTimelineBaseline") {
+                // Any baseline, not only the one on screen (22 Oct 2026).
+                responseData = activeProjectId
+                  ? readTimelineBaseline(activeProjectId, qc.args?.baseline as any)
+                  : { error: "No active project selected." };
               } else if (qc.name === "getRiskDetails") {
                 // Whole store, like getTaskDetails: projectRisks is active only
                 // now, and an id the model is holding must always resolve.
@@ -3146,15 +3196,21 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
   // A request from Claude belongs to no chat at all — Claude has no
   // conversation in this app — so it is reachable from anywhere, and the header
   // bar is what opens it. See AGENTS.md.
+  // And it belongs to its project. The review focuses records on the open
+  // project's pages, so a request left active when the user switches project
+  // waits in its own project instead of showing in the wrong one.
   const activeAcr = useAcrStore((state) =>
     state.acrs.find(
       (a) =>
         a.status === "pending" &&
         a.id === activeAcrId &&
+        (!a.projectId || a.projectId === activeProjectId) &&
         (((a as any).origin || "gemini") === "claude" ||
           a.sessionId === activeSessionId),
     ),
   );
+  const [collapsedAcrGroups, setCollapsedAcrGroups] = useState<Record<string, boolean>>({});
+  const [showDecidedLines, setShowDecidedLines] = useState(false);
 
   /**
    * The review panel is its own surface, not a strip beside the chat.
@@ -3192,27 +3248,22 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
     }
   };
 
-  const handleApproveAcr = () => {
+  /**
+   * Signs off some lines of the open request and leaves the rest open.
+   *
+   * Since 22 Oct 2026 a sign-off names lines. Without `changeIds` it takes the
+   * ticked ones, so ticking everything and pressing APPROVE SELECTED still
+   * does what SIGN OFF used to — and anything unticked stays open to talk
+   * over, instead of being thrown away. The executor and the bookkeeping live
+   * in services/acrSignOff.ts, shared with Gemini's card in the chat.
+   */
+  const handleDecideAcr = (decision: AcrDecision, changeIds?: string[]) => {
     if (!activeAcr) return;
-    const approvedChanges = activeAcr.changes.filter((c) => c.approved);
-
-    approvedChanges.forEach((change) => {
-      const { name, args } = change;
-      try {
-        // The same executor the other two paths use. Before this, the three
-        // copies disagreed on the defaults they wrote, so the same proposal
-        // produced a different record depending on which button you pressed.
-        applyProjectChange(name, args, activeProjectId);
-      } catch (err) {
-        console.error("Error executing action:", name, err);
-      }
-    });
-
-    setAcrStatus(activeAcr.id, "approved");
-    setActiveAcrId(null);
+    const ids = changeIds ?? activeAcr.changes.filter((c) => c.approved).map((c) => c.id);
+    if (!ids.length) return;
+    const result = signOffAcrLines(activeAcr.id, ids, decision);
+    if (!result) return;
     setEditingChangeId(null);
-
-    const rejectedChanges = activeAcr.changes.filter((c) => !c.approved);
 
     // A change request Claude proposed is not Gemini's to answer. Sending the
     // sign-off into this chat would make Gemini reply about work it never did.
@@ -3223,48 +3274,37 @@ const AISidebar: React.FC<AISidebarProps> = ({ onClose, isOpen }) => {
       return;
     }
 
-    const userFeedbackPart = `The user reviewed the proposed Assistant Change Request (ACR) and signed off!
+    const decidedText = result.decidedLines
+      .map((c) =>
+        decision === "applied"
+          ? `- APPROVED & APPLIED: "${c.changeTitle}" (Action: ${c.name}). Action arguments applied: ${JSON.stringify(c.args)}`
+          : `- REJECTED & DISCARDED: "${c.changeTitle}" (Action type: ${c.name})`,
+      )
+      .join("\n");
+    const openText = result.stillOpen
+      .map((c) => `- STILL OPEN (id ${c.id}): "${c.changeTitle}" (Action type: ${c.name})`)
+      .join("\n");
+
+    const userFeedbackPart = result.closed
+      ? decision === "applied"
+        ? `The user reviewed the proposed Assistant Change Request (ACR) and signed off!
 Status of changes:
-${approvedChanges.map((c) => `- APPROVED & APPLIED: "${c.changeTitle}" (Action: ${c.name}). Action arguments applied: ${JSON.stringify(c.args)}`).join("\n")}
-${rejectedChanges.map((c) => `- REJECTED & DISCARDED: "${c.changeTitle}"`).join("\n")}
+${decidedText}
 
-Please provide a conversational response acknowledging the sign-off, summarizing what was approved/applied (and specifically highlight details of any parameters that the user edited/modified before signing off!). Use pristine professional tone.`;
-
-    const feedbackMsg: Content = {
-      role: "user",
-      parts: [{ text: userFeedbackPart }],
-      _timestamp: new Date().toISOString(),
-      _isHidden: true,
-    } as any;
-
-    const chatHistory = [...messages, feedbackMsg];
-    if (activeSessionId) {
-      updateSessionMessages(activeSessionId, chatHistory);
-    }
-    setIsLoading(true);
-    processAIRequest(chatHistory, true);
-  };
-
-  const handleRejectAcr = () => {
-    if (!activeAcr) return;
-    setAcrStatus(activeAcr.id, "rejected");
-    setActiveAcrId(null);
-    setEditingChangeId(null);
-
-    // A change request Claude proposed is not Gemini's to answer. Sending the
-    // sign-off into this chat would make Gemini reply about work it never did.
-    // The bridge tells Claude instead; nothing is needed here.
-    // No import: this file is often rewritten, and a missing field must never
-    // break the build. See AGENTS.md.
-    if (((activeAcr as any).origin || "gemini") === "claude") {
-      return;
-    }
-
-    const userFeedbackPart = `The user reviewed the proposed Assistant Change Request (ACR) and rejected the entire proposal.
+Please provide a conversational response acknowledging the sign-off, summarizing what was approved/applied (and specifically highlight details of any parameters that the user edited/modified before signing off!). Use pristine professional tone.`
+        : `The user reviewed the proposed Assistant Change Request (ACR) and rejected the remaining proposal.
 Rejected proposed changes:
-${activeAcr.changes.map((c) => `- REJECTED: "${c.changeTitle}" (Action type: ${c.name})`).join("\n")}
+${decidedText}
 
-All proposed changes have been completely discarded/cancelled. Please provide a conversational response acknowledging the rejection of these changes, and ask the user how they would like to proceed or what alternative adjustments they need.`;
+All of these proposed changes have been discarded. Please provide a conversational response acknowledging the rejection of these changes, and ask the user how they would like to proceed or what alternative adjustments they need.`
+      : `The user signed off PART of the proposed Assistant Change Request (ACR).
+${decision === "applied" ? "Applied now" : "Rejected now"}:
+${decidedText}
+
+These lines are still open, waiting for the user. They want to discuss them before deciding:
+${openText}
+
+Acknowledge briefly what was ${decision === "applied" ? "applied" : "rejected"}, then ask what the user wants to change in the open lines. To revise an open line, propose the same action again for the same record (it merges into the line); to withdraw one, use discardPendingACRChange with its id.`;
 
     const feedbackMsg: Content = {
       role: "user",
@@ -3897,41 +3937,36 @@ All proposed changes have been completely discarded/cancelled. Please provide a 
 
           {/* Pending Actions */}
           {activeSessionId &&
-            getPendingAcrForSession(activeSessionId) &&
+            getPendingAcrForSession(activeSessionId, activeProjectId) &&
             (() => {
               const pendingSessionAcr =
-                getPendingAcrForSession(activeSessionId)!;
+                getPendingAcrForSession(activeSessionId, activeProjectId)!;
               return (
                 <div className="sidebar-content border-2 border-qb-orange p-4 bg-transparent shadow-sm flex flex-col gap-3 shrink-0">
                   <div className="text-xs font-black uppercase tracking-widest text-qb-orange flex items-center gap-2">
                     <span className="animate-pulse flex h-2 w-2 rounded-full bg-qb-orange"></span>
                     {pendingSessionAcr.changes.length} SYSTEM MODIFICATION(S)
-                    PROPOSED
+                    {(pendingSessionAcr.decided || []).length > 0 ? " STILL OPEN" : " PROPOSED"}
                   </div>
 
                   <div className="flex gap-2 mt-1">
                     <button
                       onClick={() => {
-                        const approvedChanges = pendingSessionAcr.changes;
-                        approvedChanges.forEach((change) => {
-                          const { name, args } = change;
-                          try {
-                            // Same executor as the review panel. These two used
-                            // to be separate copies that disagreed.
-                            applyProjectChange(name, args, activeProjectId);
-                          } catch (err) {
-                            console.error("Error executing action:", name, err);
-                          }
-                        });
-
-                        setAcrStatus(pendingSessionAcr.id, "approved");
+                        // Every open line, through the same sign-off as the
+                        // review panel (services/acrSignOff.ts).
+                        const count = pendingSessionAcr.changes.length;
+                        signOffAcrLines(
+                          pendingSessionAcr.id,
+                          pendingSessionAcr.changes.map((c) => c.id),
+                          "applied",
+                        );
                         setActiveAcrId(null);
 
                         const systemMsg = {
                           role: "model",
                           parts: [
                             {
-                              text: `✓ Approved: Applied all ${pendingSessionAcr.changes.length} proposed changes to your project.`,
+                              text: `✓ Approved: Applied all ${count} open proposed changes to your project.`,
                             },
                           ],
                           _timestamp: new Date().toISOString(),
@@ -3956,7 +3991,11 @@ All proposed changes have been completely discarded/cancelled. Please provide a 
                     </button>
                     <button
                       onClick={() => {
-                        setAcrStatus(pendingSessionAcr.id, "rejected");
+                        signOffAcrLines(
+                          pendingSessionAcr.id,
+                          pendingSessionAcr.changes.map((c) => c.id),
+                          "rejected",
+                        );
                         setActiveAcrId(null);
                         const systemMsg = {
                           role: "model",
@@ -4334,8 +4373,8 @@ All proposed changes have been completely discarded/cancelled. Please provide a 
 
           {/* Prompt banner */}
           <div className="bg-qb-orange/5 border-b border-qb-light-grey p-4 text-[10px] uppercase font-black tracking-widest leading-relaxed text-qb-grey">
-            REVIEW CRITICAL CHANGES PROPOSED BY ASSISTANT. UNCHECK ITEMS TO
-            DECLINE THEM. CLICK TO FOCUS ON TARGET PAGE.
+            TICK WHAT YOU AGREE WITH AND APPROVE IT. UNTICKED LINES STAY OPEN
+            FOR DISCUSSION. CLICK A LINE TO SEE IT ON ITS PAGE.
           </div>
 
           {/* Select All Toggle */}
@@ -4357,7 +4396,7 @@ All proposed changes have been completely discarded/cancelled. Please provide a 
                 htmlFor="acr-select-all"
                 className="text-[10px] font-black uppercase tracking-widest text-qb-black cursor-pointer select-none"
               >
-                SELECT ALL PROPOSALS
+                SELECT ALL OPEN
               </label>
             </div>
             <span className="text-[10px] font-mono font-bold text-qb-grey">
@@ -4366,38 +4405,160 @@ All proposed changes have been completely discarded/cancelled. Please provide a 
             </span>
           </div>
 
-          {/* List of changes */}
+          {/* List of changes, under the headings the assistant gave them */}
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-            {activeAcr.changes.map((change) => (
-              <AcrChangeCard
-                key={change.id}
-                change={change}
-                activeAcrChangeId={activeAcrChangeId}
-                isMouseOverSidebar={isMouseOverSidebar}
-                activeAcrId={activeAcr.id}
-                updateAcrChangeApproval={updateAcrChangeApproval}
-                getModulePathForTool={getModulePathForTool}
-                handleFocusChange={handleFocusChange}
-                setActiveAcrChangeId={setActiveAcrChangeId}
-              />
-            ))}
+            {(() => {
+              const renderCard = (change: ACRChange) => (
+                <AcrChangeCard
+                  key={change.id}
+                  change={change}
+                  activeAcrChangeId={activeAcrChangeId}
+                  isMouseOverSidebar={isMouseOverSidebar}
+                  activeAcrId={activeAcr.id}
+                  updateAcrChangeApproval={updateAcrChangeApproval}
+                  getModulePathForTool={getModulePathForTool}
+                  handleFocusChange={handleFocusChange}
+                  setActiveAcrChangeId={setActiveAcrChangeId}
+                  onDecide={(decision) => handleDecideAcr(decision, [change.id])}
+                />
+              );
+
+              // No headings at all: the plain list, exactly as before.
+              if (!hasNamedGroups(activeAcr.changes)) {
+                return activeAcr.changes.map(renderCard);
+              }
+
+              return groupAcrLines(activeAcr.changes).map((group) => {
+                const groupKey = `${activeAcr.id}:${group.key}`;
+                const collapsed = !!collapsedAcrGroups[groupKey];
+                const ids = group.changes.map((c) => c.id);
+                const selected = group.changes.filter((c) => c.approved).length;
+                const all = selected === group.changes.length;
+                return (
+                  <section key={groupKey} className="flex flex-col gap-2" aria-label={group.title}>
+                    <div className="flex items-center gap-2 border-b border-qb-black/60 pb-1.5 pt-1 sticky top-0 bg-qb-bg z-10">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select every line in ${group.title}`}
+                        checked={all}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selected > 0 && !all;
+                        }}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          ids.forEach((id) => updateAcrChangeApproval(activeAcr.id, id, checked));
+                        }}
+                        className="w-4 h-4 shrink-0 border border-qb-light-grey accent-qb-orange focus:ring-0 focus:outline-none rounded-none cursor-pointer"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollapsedAcrGroups((prev) => ({ ...prev, [groupKey]: !collapsed }))
+                        }
+                        className="flex-1 min-w-0 flex items-center gap-1.5 text-left cursor-pointer"
+                        aria-expanded={!collapsed}
+                      >
+                        {collapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0 text-qb-grey" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 shrink-0 text-qb-grey" />
+                        )}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-qb-black truncate" title={group.title}>
+                          {group.title}
+                        </span>
+                        <span className="text-[9px] font-mono font-bold text-qb-grey shrink-0">
+                          {selected}/{group.changes.length}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDecideAcr("applied", ids)}
+                        title={`Approve all ${ids.length} line${ids.length === 1 ? "" : "s"} in this group`}
+                        className="p-1 border border-qb-light-grey text-qb-dark-grey hover:border-qb-green hover:text-qb-green transition-colors cursor-pointer"
+                      >
+                        <Check className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDecideAcr("rejected", ids)}
+                        title={`Reject all ${ids.length} line${ids.length === 1 ? "" : "s"} in this group`}
+                        className="p-1 border border-qb-light-grey text-qb-dark-grey hover:border-qb-magenta hover:text-qb-magenta transition-colors cursor-pointer"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {!collapsed && group.changes.map(renderCard)}
+                  </section>
+                );
+              });
+            })()}
+
+            {/* What was already signed off in this request, kept in view so a
+                partly approved request still reads as a whole. */}
+            {(activeAcr.decided || []).length > 0 && (
+              <div className="mt-2 border-t border-qb-light-grey pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDecidedLines(!showDecidedLines)}
+                  className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-qb-grey hover:text-qb-black cursor-pointer"
+                  aria-expanded={showDecidedLines}
+                >
+                  {showDecidedLines ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  Already signed off ({(activeAcr.decided || []).length})
+                </button>
+                {showDecidedLines && (
+                  <ul className="mt-2 flex flex-col gap-1.5">
+                    {(activeAcr.decided || []).map((line) => (
+                      <li key={line.id} className="flex items-start gap-2 text-[10px] leading-snug">
+                        <span
+                          className={`shrink-0 font-black uppercase tracking-widest ${line.decision === "applied" ? "text-qb-green" : "text-qb-magenta"}`}
+                        >
+                          {line.decision === "applied" ? "Applied" : "Rejected"}
+                        </span>
+                        <span className={`min-w-0 break-words font-bold text-qb-dark-grey ${line.decision === "rejected" ? "line-through" : ""}`}>
+                          {line.group ? <span className="text-qb-grey">{line.group} · </span> : null}
+                          {line.changeTitle}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Action Footer */}
-          <div className="border-t border-qb-light-grey p-4 bg-transparent flex flex-col gap-2 shrink-0">
-            <button
-              onClick={handleApproveAcr}
-              className="w-full bg-qb-black hover:bg-qb-orange text-white text-xs font-black uppercase tracking-widest py-3 transition-colors text-center cursor-pointer font-sans"
-            >
-              SIGN OFF
-            </button>
-            <button
-              onClick={handleRejectAcr}
-              className="w-full bg-transparent hover:bg-qb-magenta/5 text-qb-magenta text-xs font-black uppercase tracking-widest py-3 border border-qb-light-grey hover:border-qb-magenta transition-colors text-center cursor-pointer font-sans"
-            >
-              REJECT ALL
-            </button>
-          </div>
+          {(() => {
+            const selectedCount = activeAcr.changes.filter((c) => c.approved).length;
+            const openAfter = activeAcr.changes.length - selectedCount;
+            return (
+              <div className="border-t border-qb-light-grey p-4 bg-transparent flex flex-col gap-2 shrink-0">
+                <button
+                  onClick={() => handleDecideAcr("applied")}
+                  disabled={selectedCount === 0}
+                  className="w-full bg-qb-black hover:bg-qb-orange disabled:bg-qb-light-grey disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-widest py-3 transition-colors text-center cursor-pointer font-sans"
+                >
+                  {selectedCount === activeAcr.changes.length
+                    ? `APPROVE ALL (${selectedCount})`
+                    : `APPROVE SELECTED (${selectedCount})`}
+                </button>
+                <button
+                  onClick={() => handleDecideAcr("rejected")}
+                  disabled={selectedCount === 0}
+                  className="w-full bg-transparent hover:bg-qb-magenta/5 disabled:opacity-40 disabled:cursor-not-allowed text-qb-magenta text-xs font-black uppercase tracking-widest py-3 border border-qb-light-grey hover:border-qb-magenta transition-colors text-center cursor-pointer font-sans"
+                >
+                  {selectedCount === activeAcr.changes.length
+                    ? `REJECT ALL (${selectedCount})`
+                    : `REJECT SELECTED (${selectedCount})`}
+                </button>
+                {openAfter > 0 && selectedCount > 0 && (
+                  <p className="text-[9px] font-mono font-bold uppercase tracking-widest text-qb-grey text-center">
+                    {openAfter} unticked line{openAfter === 1 ? "" : "s"} will stay open
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -4417,6 +4578,8 @@ interface AcrChangeCardProps {
   getModulePathForTool: (name: string) => string | null;
   handleFocusChange: (change: any) => void;
   setActiveAcrChangeId: (changeId: string | null) => void;
+  /** Sign off this one line now; the rest of the request stays open. */
+  onDecide?: (decision: AcrDecision) => void;
 }
 
 const AcrChangeCard: React.FC<AcrChangeCardProps> = ({
@@ -4428,6 +4591,7 @@ const AcrChangeCard: React.FC<AcrChangeCardProps> = ({
   getModulePathForTool,
   handleFocusChange,
   setActiveAcrChangeId,
+  onDecide,
 }) => {
   const isFocused = activeAcrChangeId === change.id;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -4524,8 +4688,10 @@ const AcrChangeCard: React.FC<AcrChangeCardProps> = ({
           {kindStyle.label}
         </div>
 
+        {/* Unticked means "not in this sign-off", not "declined": it stays
+            open. So no strike-through, only a quieter title. */}
         <h4
-          className={`text-xs font-black uppercase tracking-wider mb-1 leading-snug break-words ${change.approved ? "text-qb-black" : "text-qb-grey line-through"}`}
+          className={`text-xs font-black uppercase tracking-wider mb-1 leading-snug break-words ${change.approved ? "text-qb-black" : "text-qb-grey"}`}
         >
           {change.changeTitle}
         </h4>
@@ -4580,6 +4746,33 @@ const AcrChangeCard: React.FC<AcrChangeCardProps> = ({
           </span>
         )}
       </div>
+
+      {/* This line alone, now. Everything else in the request stays open. */}
+      {onDecide && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex flex-col gap-1 shrink-0 self-start"
+        >
+          <button
+            type="button"
+            onClick={() => onDecide("applied")}
+            title="Approve this line now"
+            aria-label="Approve this line now"
+            className="p-1 border border-qb-light-grey text-qb-dark-grey hover:border-qb-green hover:text-qb-green hover:bg-qb-green/5 transition-colors cursor-pointer"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDecide("rejected")}
+            title="Reject this line now"
+            aria-label="Reject this line now"
+            className="p-1 border border-qb-light-grey text-qb-dark-grey hover:border-qb-magenta hover:text-qb-magenta hover:bg-qb-magenta/5 transition-colors cursor-pointer"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

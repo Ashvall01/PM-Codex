@@ -987,7 +987,7 @@ ${mom.actionItems.map(a => `- [${a.status}] ${a.description} (Assignee: ${a.assi
                         }`}
                       >
                         <Check className="w-3.5 h-3.5" />
-                        {activeMom.isApproved ? 'STAGED (APPROVED)' : 'DECLINED (EXCLUDED)'}
+                        {activeMom.isApproved ? 'SELECTED FOR SIGN-OFF' : 'NOT SELECTED (STAYS OPEN)'}
                       </button>
                     )}
                     <button

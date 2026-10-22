@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useRef, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   MessageSquare,
   Search,
@@ -68,6 +68,33 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const actualSidebarWidth = isReviewOnly
     ? Math.max(sidebarWidth, 420)
     : sidebarWidth + (activeAcrId ? 360 : 0);
+
+  /**
+   * How wide a module's detail tray may be (22 Oct 2026).
+   *
+   * Trays were a fixed 600px (Deliverables 500px). With the assistant pane
+   * open beside a review and a tray open on the right, the list between them
+   * was left about 100px, and its rows ran over each other. The tray now
+   * gives way first, down to 400px, so the list keeps at least ~440px when
+   * the screen allows it. Read by the modules as var(--tray-w) and
+   * var(--tray-w-sm); only used from the lg breakpoint, where the pane sits
+   * beside the content instead of over it.
+   */
+  const assistantPaneWidth = isAIOpen ? actualSidebarWidth : 0;
+  const trayWidthVars = {
+    '--tray-w': `clamp(400px, calc(100vw - ${assistantPaneWidth}px - 440px), 600px)`,
+    '--tray-w-sm': `clamp(400px, calc(100vw - ${assistantPaneWidth}px - 440px), 500px)`,
+  } as React.CSSProperties;
+
+  // A review belongs to its project. Switching project leaves the open review
+  // behind (the panel would not show it), so the pane must not keep room for it.
+  useEffect(() => {
+    if (!activeAcrId) return;
+    const open = useAcrStore.getState().acrs.find((a) => a.id === activeAcrId);
+    if (open && open.projectId && open.projectId !== activeProjectId) {
+      useAcrStore.getState().setActiveAcrId(null);
+    }
+  }, [activeProjectId, activeAcrId]);
 
   const visibleGroups = navGroups
     .map(g => ({ ...g, items: g.items.filter(item => item.path !== '/billing' || isBillingEnabled) }))
@@ -150,7 +177,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-qb-bg text-qb-black font-sans selection:bg-qb-orange selection:text-white">
+    <div
+      className="flex flex-col h-screen w-full overflow-hidden bg-qb-bg text-qb-black font-sans selection:bg-qb-orange selection:text-white"
+      style={trayWidthVars}
+    >
       <PIIGlobalHighlighter />
       <PIISuggestionOverlay />
       <PIISelectionToolbar />
@@ -342,46 +372,103 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
  */
 const ClaudeProposalBar: React.FC = () => {
   const activeProjectId = useAppStore((state) => state.activeProjectId);
+  const projects = useAppStore((state) => state.projects);
   const setActiveAcrId = useAcrStore((state) => state.setActiveAcrId);
   const setIsAIOpen = useAiStore((state) => state.setSidebarOpen);
+  const acrs = useAcrStore((state) => state.acrs);
+  const navigate = useNavigate();
 
-  const pending = useAcrStore((state) =>
-    state.acrs.find(
-      (a: any) =>
-        a.status === 'pending' &&
-        (a.origin || 'gemini') === 'claude' &&
-        a.projectId === activeProjectId
-    )
+  const mine = acrs.filter(
+    (a: any) => a.status === 'pending' && (a.origin || 'gemini') === 'claude'
+  );
+  const pending = mine.find((a: any) => a.projectId === activeProjectId);
+  // Claude can file a request in any project (22 Oct 2026). One waiting in
+  // another project is pointed to from here, so it is never invisible.
+  const elsewhere = mine.filter(
+    (a: any) => a.projectId !== activeProjectId && (projects || []).some((p: any) => p.id === a.projectId)
   );
 
-  if (!pending) return null;
+  if (!pending && elsewhere.length === 0) return null;
 
-  const count = pending.changes.length;
+  const openReview = (acrId: string) => {
+    // Remember whether we are the ones opening the sidebar, so closing
+    // this review (X / sign off / reject, all in acrStore's
+    // setActiveAcrId) can put it back rather than leaving Claude's chat
+    // open when the user never asked to see it. See PLAN.md section 17.
+    if (!useAiStore.getState().isSidebarOpen) {
+      useAiStore.getState().setSidebarOpenedByAcr(true);
+    }
+    setIsAIOpen(true);
+    setActiveAcrId(acrId);
+  };
 
+  const openInProject = (acr: any) => {
+    useAppStore.getState().setActiveProject(acr.projectId);
+    navigate('/overview');
+    openReview(acr.id);
+  };
+
+  const nameOf = (projectId: string) =>
+    (projects || []).find((p: any) => p.id === projectId)?.name || 'another project';
+
+  const count = pending ? pending.changes.length : 0;
+  const signedOff = pending ? (pending.decided || []).length : 0;
+
+  // Everything sits on the left: a detail tray covers the right of the screen,
+  // header included, and a link under it cannot be clicked.
   return (
-    <button
-      type="button"
-      onClick={() => {
-        // Remember whether we are the ones opening the sidebar, so closing
-        // this review (X / sign off / reject, all in acrStore's
-        // setActiveAcrId) can put it back rather than leaving Claude's chat
-        // open when the user never asked to see it. See PLAN.md section 17.
-        if (!useAiStore.getState().isSidebarOpen) {
-          useAiStore.getState().setSidebarOpenedByAcr(true);
-        }
-        setIsAIOpen(true);
-        setActiveAcrId(pending.id);
-      }}
-      className="w-full flex-shrink-0 flex items-center gap-3 px-4 py-2 bg-qb-orange/10 border-b border-qb-orange text-left hover:bg-qb-orange/20 transition-colors cursor-pointer"
-    >
-      <span className="flex-shrink-0 w-2 h-2 bg-qb-orange animate-pulse" />
-      <span className="text-[10px] font-black uppercase tracking-widest text-qb-black font-sans">
-        Claude has proposed {count} change{count === 1 ? '' : 's'}
-      </span>
-      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange ml-auto">
-        Review →
-      </span>
-    </button>
+    <div className="w-full flex-shrink-0 flex items-stretch bg-qb-orange/10 border-b border-qb-orange">
+      {pending ? (
+        <button
+          type="button"
+          onClick={() => openReview(pending.id)}
+          className="min-w-0 flex items-center gap-3 px-4 py-2 text-left hover:bg-qb-orange/20 transition-colors cursor-pointer"
+        >
+          <span className="flex-shrink-0 w-2 h-2 bg-qb-orange animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-qb-black font-sans truncate">
+            {signedOff > 0
+              ? `Claude has ${count} change${count === 1 ? '' : 's'} still open · ${signedOff} signed off`
+              : `Claude has proposed ${count} change${count === 1 ? '' : 's'}`}
+          </span>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-qb-orange shrink-0">
+            Review →
+          </span>
+        </button>
+      ) : (
+        <div className="min-w-0 flex items-center gap-3 px-4 py-2">
+          <span className="flex-shrink-0 w-2 h-2 bg-qb-orange" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey font-sans truncate">
+            Claude has proposed changes in another project
+          </span>
+        </div>
+      )}
+      {elsewhere.map((acr: any) => (
+        <button
+          key={acr.id}
+          type="button"
+          onClick={() => openInProject(acr)}
+          title={`Switch to ${nameOf(acr.projectId)} and review`}
+          className="flex-shrink-0 max-w-[40%] flex items-center gap-1.5 px-4 py-2 border-l border-qb-orange/40 text-[10px] font-mono font-bold uppercase tracking-widest text-qb-dark-grey hover:text-qb-orange hover:bg-qb-orange/20 transition-colors cursor-pointer"
+        >
+          <span className="truncate">
+            {acr.changes.length} in {nameOf(acr.projectId)}
+          </span>
+          <span className="shrink-0">→</span>
+        </button>
+      ))}
+      {/* The rest of the bar still opens the review, as the whole bar did. */}
+      {pending ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => openReview(pending.id)}
+          className="flex-1 hover:bg-qb-orange/20 transition-colors cursor-pointer"
+        />
+      ) : (
+        <div className="flex-1" />
+      )}
+    </div>
   );
 };
 

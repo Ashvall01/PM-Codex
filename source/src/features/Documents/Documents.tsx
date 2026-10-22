@@ -82,7 +82,7 @@ export const Documents: React.FC = () => {
   return (
     <div className="h-full flex bg-transparent font-sans">
       {/* List View */}
-      <div className={`flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${activeDoc ? 'lg:mr-[600px]' : ''} transition-all duration-300`}>
+      <div className={`flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${activeDoc ? 'lg:mr-[var(--tray-w,600px)]' : ''} transition-all duration-300`}>
         <PageHeader
           title="Documents"
           stats={<>
@@ -172,19 +172,19 @@ export const Documents: React.FC = () => {
 
       {/* Slide-out Detail Panel */}
       <div 
-        className={`fixed top-0 right-0 h-full w-full lg:w-[600px] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-40 lg:z-30 shadow-2xl lg:shadow-none ${activeDoc ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`@container/tray fixed top-0 right-0 h-full w-full lg:w-[var(--tray-w,600px)] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-40 lg:z-30 shadow-2xl lg:shadow-none ${activeDoc ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {activeDoc && (
           <>
-            <header className="flex justify-between items-center px-6 lg:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
+            <header className="flex justify-between items-center gap-3 px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
               <div className="absolute bottom-0 left-0 h-0.5 w-12 bg-qb-orange"></div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 min-w-0">
                 <span className="text-[10px] font-bold text-qb-grey uppercase tracking-widest leading-none">DOCUMENT DETAILS</span>
-                <h2 className="text-2xl font-black text-qb-black uppercase tracking-widest mt-1">
+                <h2 className="text-lg @min-[540px]/tray:text-2xl font-black text-qb-black uppercase tracking-widest mt-1">
                   VIEW DOCUMENT
                 </h2>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 @min-[540px]/tray:gap-4 shrink-0">
                 <button
                   onClick={() => setShowDeleteConfirm(activeDoc.id)}
                   className="p-3 bg-transparent text-qb-grey border-2 border-transparent hover:text-qb-magenta hover:border-qb-magenta transition-colors cursor-pointer"
@@ -211,7 +211,7 @@ export const Documents: React.FC = () => {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
+            <div className="flex-1 overflow-y-auto px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
               {/* Document Title */}
               <div>
                 <label className="block text-xs font-black text-qb-grey uppercase tracking-widest mb-2 border-b border-qb-light-grey pb-1">

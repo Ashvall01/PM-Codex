@@ -145,19 +145,19 @@ export const TaskTray: React.FC<TaskTrayProps> = ({ activeItemId, activeItem, on
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-full lg:w-[600px] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-50 shadow-2xl lg:shadow-none ${realActiveItem ? 'translate-x-0' : 'translate-x-full'}`}
+      className={`@container/tray fixed top-0 right-0 h-full w-full lg:w-[var(--tray-w,600px)] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-50 shadow-2xl lg:shadow-none ${realActiveItem ? 'translate-x-0' : 'translate-x-full'}`}
     >
       {realActiveItem && (
         <>
-          <header className="flex justify-between items-center px-6 lg:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
+          <header className="flex justify-between items-center gap-3 px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
             <div className="absolute bottom-0 left-0 h-0.5 w-12 bg-qb-orange"></div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 min-w-0">
               <span className="text-[10px] font-black tracking-widest text-qb-grey uppercase">
                 {realActiveItem.type}
               </span>
-              <h2 className="text-xl lg:text-2xl font-black uppercase tracking-widest text-qb-black">Item Details</h2>
+              <h2 className="text-lg @min-[540px]/tray:text-2xl font-black uppercase tracking-widest text-qb-black">Item Details</h2>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 @min-[540px]/tray:gap-4 shrink-0">
               {!readOnly && !(realActiveItem as any).isAcrProposedAdd && !(realActiveItem as any).isAcrProposedDelete && !(realActiveItem as any).isAcrProposedUpdate && (
                 <button
                   type="button"
@@ -173,7 +173,7 @@ export const TaskTray: React.FC<TaskTrayProps> = ({ activeItemId, activeItem, on
                 </button>
               )}
               {!readOnly && !(realActiveItem as any).isAcrProposedAdd && !(realActiveItem as any).isAcrProposedDelete && !(realActiveItem as any).isAcrProposedUpdate && (
-                <div className="relative group/editbtn flex items-center">
+                <div className="relative group/editbtn hidden @min-[540px]/tray:flex items-center">
                   <div
                     className="p-3 border-2 border-qb-light-grey text-qb-grey bg-transparent cursor-default select-none flex items-center justify-center"
                   >
@@ -212,7 +212,7 @@ export const TaskTray: React.FC<TaskTrayProps> = ({ activeItemId, activeItem, on
             </div>
           </header>
           
-          <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
+          <div className="flex-1 overflow-y-auto px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
             {/* One banner, the same in every module: what kind of change this
                 is, its title, and every field it moves. */}
             {/* A removal is the one change no field on this screen can

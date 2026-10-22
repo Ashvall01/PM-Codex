@@ -45,6 +45,12 @@ import { isCodexFolder, codexFolderOf } from '../utils/codexRules';
  */
 
 export interface SkeletonOptions {
+  /**
+   * Which timeline baseline (revision) the timeline section shows, by name or
+   * id. Omit for the active one — the baseline on screen. Added 22 Oct 2026 so
+   * the assistants can read and compare the others.
+   */
+  baseline?: string;
   /** Include the billing section. The sidebar hides it when billing is off. */
   includeBilling?: boolean;
   /** Include the project name and description header. */
@@ -106,6 +112,13 @@ function ymd(value?: string | number | null): string {
   if (!s) return '';
   const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : s;
+}
+
+/** A timestamp (number or string) as YYYY-MM-DD in UTC. Blank when unreadable. */
+function dayOf(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = new Date(typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : (value as any));
+  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
 /** Blank for anything empty or a placeholder, so the reader is not told "N/A" 260 times. */
@@ -238,14 +251,24 @@ function buildSections(activeProjectId: string, options: SkeletonOptions): Secti
   }
 
   // ------------------------------------------------------------ timeline
-  const activeRevision = projectTimeline?.revisions.find((r) => r.id === projectTimeline.activeRevisionId);
+  // The baseline on screen, unless a reader asked for another one by name or
+  // id (get_module "timeline" with a baseline, or getTimelineBaseline).
+  const onScreen = projectTimeline?.revisions.find((r) => r.id === projectTimeline.activeRevisionId);
+  const activeRevision = options.baseline && projectTimeline
+    ? findBaseline(projectTimeline.revisions, options.baseline)
+    : onScreen;
   if (projectTimeline && activeRevision) {
+    const isOnScreen = activeRevision.id === onScreen?.id;
     const others = projectTimeline.revisions
       .filter((r) => r.id !== activeRevision.id)
-      .map((r) => r.name)
-      .join(', ');
-    const lines = [`=== TIMELINE — ${activeRevision.name} (${activeRevision.activities.length} activities) ===`];
-    if (others) lines.push(`Other baselines: ${others}`);
+      .map((r) => `${r.name}${r.id === onScreen?.id ? ' [active]' : ''} (${dayOf(r.createdAt) || '?'}, ${r.activities.length} rows)`)
+      .join('; ');
+    const lines = [
+      `=== TIMELINE — ${activeRevision.name} (${activeRevision.activities.length} activities)${isOnScreen ? '' : ' — NOT the active baseline, shown read-only for comparison'} ===`,
+    ];
+    if (others) {
+      lines.push(`Other baselines: ${others}. Read one with get_module "timeline" and its baseline name (Claude) or getTimelineBaseline (Gemini).`);
+    }
     // The holiday list is project data like any other: WORKDAY and NETWORKDAYS
     // skip these days, so a reader planning dates needs them. Written in full;
     // setTimelineHolidays replaces the whole list.
@@ -562,6 +585,14 @@ export function buildProjectModule(module: string, targetProjectId?: string, opt
     return `Unknown module "${module}". Valid modules are: ${MODULE_KEYS.join(', ')}.`;
   }
 
+  if (key === 'timeline' && options.baseline) {
+    const timeline = useTimelineStore.getState().getProjectTimeline(activeProjectId);
+    if (!timeline || !findBaseline(timeline.revisions, options.baseline)) {
+      const names = (timeline?.revisions || []).map((r) => `"${r.name}"`).join(', ');
+      return `No timeline baseline "${options.baseline}" in this project.${names ? ` Baselines: ${names}.` : ''}`;
+    }
+  }
+
   const section = buildSections(activeProjectId, options).find((s) => s.key === key);
   if (!section) return `The "${key}" module is empty for this project — it holds no records.`;
   return section.lines.join('\n');
@@ -593,6 +624,64 @@ export function getSanitizedProjectModule(module: string, targetProjectId?: stri
   if (!activeProjectId) return raw;
 
   return sanitizeString(raw, piiEntriesFor(activeProjectId));
+}
+
+/**
+ * A baseline by id, then by name (case and spacing ignored). Baselines are the
+ * timeline's revisions; the one on screen is the active one.
+ */
+export function findBaseline<T extends { id: string; name: string }>(revisions: T[], wanted: string): T | undefined {
+  const w = String(wanted || '').trim();
+  if (!w) return undefined;
+  const norm = (s: string) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const realId = useIdAliasStore.getState().getRealId?.(w) || w;
+  return revisions.find((r) => r.id === w || r.id === realId) || revisions.find((r) => norm(r.name) === norm(w));
+}
+
+/**
+ * Any timeline baseline, for Gemini's getTimelineBaseline (Claude reads the
+ * same thing through get_module "timeline" with a baseline). Without a name it
+ * lists the baselines; with one it returns that baseline's rows. Unmasked:
+ * Gemini's history is masked as a whole before it is sent.
+ */
+export function readTimelineBaseline(projectId: string, baseline?: string): any {
+  const timeline = useTimelineStore.getState().getProjectTimeline(projectId);
+  if (!timeline) return { error: 'This project has no timeline yet.' };
+  const listed = timeline.revisions.map((r) => ({
+    id: r.id,
+    name: r.name,
+    createdAt: dayOf(r.createdAt),
+    activities: r.activities.length,
+    isActive: r.id === timeline.activeRevisionId,
+  }));
+  if (!baseline || !String(baseline).trim()) {
+    return { baselines: listed, note: 'Pass a baseline name or id to read its rows.' };
+  }
+  const found = findBaseline(timeline.revisions, String(baseline));
+  if (!found) return { error: `No baseline "${baseline}".`, baselines: listed };
+  return {
+    id: found.id,
+    name: found.name,
+    isActive: found.id === timeline.activeRevisionId,
+    createdAt: dayOf(found.createdAt),
+    activityCount: found.activities.length,
+    note: found.id === timeline.activeRevisionId
+      ? 'This is the active baseline, the one on screen.'
+      : 'Not the active baseline. Read-only here: proposals change the active baseline.',
+    activities: found.activities.map((a: any) => ({
+      id: a.id,
+      phase: a.phase,
+      activity: a.activity,
+      subActivity: a.subActivity,
+      status: a.status,
+      progress: a.progress,
+      owner: a.owner,
+      targetStartDate: ymd(a.targetStartDate),
+      targetCompletionDate: ymd(a.targetCompletionDate),
+      actualStartDate: ymd(a.actualStartDate),
+      actualCompletionDate: ymd(a.actualCompletionDate),
+    })),
+  };
 }
 
 function piiEntriesFor(projectId: string) {

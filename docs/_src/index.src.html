@@ -49,7 +49,8 @@
         <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
           <span class="h-4 pt-1.5 text-[9px] leading-none font-black uppercase tracking-[0.2em] text-qb-grey/70 whitespace-nowrap">Data</span>
           <div class="flex-1 flex items-stretch gap-4">
-            <a href="#privacy" data-spy="privacy" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Privacy</a>
+            <a href="#glossary" data-spy="glossary" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Privacy glossary</a>
+            <a href="#privacy" data-spy="privacy" class="relative text-xs uppercase tracking-wider whitespace-nowrap flex items-center text-qb-grey hover:text-qb-dark-grey transition-colors">Your data</a>
           </div>
         </div>
         <div class="flex flex-col h-full shrink-0 pl-4 border-l border-qb-light-grey/70">
@@ -93,6 +94,7 @@
       <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Runs on</dt><dd class="text-qb-black">Your Mac, localhost:7800</dd>
       <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Data</dt><dd class="text-qb-black">Your own Google Sheet</dd>
       <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Assistants</dt><dd class="text-qb-black">Claude, Gemini <span class="text-qb-grey">(optional)</span></dd>
+      <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Names</dt><dd class="text-qb-black"><a href="#glossary" class="hover:text-qb-orange transition-colors">Masked before the AI sees them →</a></dd>
       <dt class="text-[10px] font-sans font-black tracking-widest text-qb-dark-grey">Price</dt><dd class="text-qb-black">Free, GPL-3.0</dd>
       </dl>
     </div>
@@ -411,9 +413,88 @@
   </div>
 </section>
 
+<!-- ============================================================ PRIVACY GLOSSARY
+     The app's data-safety feature, given its own section (22 Oct 2026): what it
+     does, the three ways to add a term, and how to keep the list in shape.
+     Wording follows the app: Settings → Privacy glossary, the shield button,
+     Create new / Add as variation, the [Redacted_Type_N] tokens. -->
+<section id="glossary" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36">
+  <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Privacy glossary</h2>
+    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">Names never reach the AI as names</span>
+  </div>
+
+  <div class="mt-10 grid lg:grid-cols-12 gap-10 lg:gap-12">
+    <div class="lg:col-span-5">
+      <p class="text-[17px] sm:text-lg leading-[1.7] text-qb-black">List the names you would rather keep to yourself: people, clients, vendors, systems. Before anything is sent to Claude or Gemini, every listed name, and every variation of it, becomes a token such as <span class="font-mono text-[14px]">[Redacted_Name_1]</span>. The answer comes back in tokens, and the app turns them back into the real names on your screen.</p>
+      <ul class="mt-6 border-t border-qb-light-grey">
+        <li class="flex gap-3 py-3 border-b border-qb-light-grey text-[14px] leading-relaxed text-qb-black"><i data-icon="shield-check" class="w-4 h-4 mt-0.5 shrink-0 text-qb-orange"></i><span><b class="font-black uppercase tracking-wider text-[11px] text-qb-dark-grey mr-1">Both assistants.</b> Claude through the bridge, Gemini in the sidebar: the same glossary masks everything each one reads, and turns back what each one proposes.</span></li>
+        <li class="flex gap-3 py-3 border-b border-qb-light-grey text-[14px] leading-relaxed text-qb-black"><i data-icon="users" class="w-4 h-4 mt-0.5 shrink-0 text-qb-orange"></i><span><b class="font-black uppercase tracking-wider text-[11px] text-qb-dark-grey mr-1">One per project.</b> Each project keeps its own list, so a client in one project is not a token in another. When Claude reads another project, that project's glossary masks it.</span></li>
+        <li class="flex gap-3 py-3 border-b border-qb-light-grey text-[14px] leading-relaxed text-qb-black"><i data-icon="eye-off" class="w-4 h-4 mt-0.5 shrink-0 text-qb-orange"></i><span><b class="font-black uppercase tracking-wider text-[11px] text-qb-dark-grey mr-1">The AI never guesses.</b> It works with the tokens and refers to people by their role, never asking who a token stands for.</span></li>
+      </ul>
+    </div>
+
+    <ol class="lg:col-span-7 self-start border border-qb-light-grey relative" aria-label="What happens to a name">
+      <span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange"></span>
+      <li class="p-5 border-b border-qb-light-grey">
+        <p class="text-[9px] font-black uppercase tracking-widest text-qb-grey mb-1.5"><span class="font-mono text-qb-dark-grey mr-2">01</span>On your screen</p>
+        <p class="text-base text-qb-black">Ask <mark class="pii-mark">Hana Okafor</mark> to approve the budget for <mark class="pii-mark">Kestrel Foods</mark>.</p>
+      </li>
+      <li class="p-5 border-b border-qb-light-grey bg-qb-orange/5">
+        <p class="text-[9px] font-black uppercase tracking-widest text-qb-orange mb-1.5"><span class="font-mono mr-2">02</span>What the AI receives</p>
+        <p class="font-mono text-[12.5px] leading-relaxed text-qb-black">Ask [Redacted_Name_1] to approve the budget for [Redacted_Organization_1].</p>
+      </li>
+      <li class="p-5 border-b border-qb-light-grey">
+        <p class="text-[9px] font-black uppercase tracking-widest text-qb-grey mb-1.5"><span class="font-mono text-qb-dark-grey mr-2">03</span>What it proposes</p>
+        <p class="font-mono text-[12.5px] leading-relaxed text-qb-black">New task: "Chase [Redacted_Name_1] for the budget sign-off"</p>
+      </li>
+      <li class="p-5">
+        <p class="text-[9px] font-black uppercase tracking-widest text-qb-grey mb-1.5"><span class="font-mono text-qb-dark-grey mr-2">04</span>What you review and keep</p>
+        <p class="text-base text-qb-black">Chase <mark class="pii-mark">Hana Okafor</mark> for the budget sign-off</p>
+      </li>
+    </ol>
+  </div>
+
+  <h3 class="mt-16 text-sm font-black uppercase tracking-widest text-qb-black">Add a name — three ways</h3>
+  <ol class="mt-4 grid md:grid-cols-3 gap-px bg-qb-light-grey border border-qb-light-grey">
+    <li class="bg-qb-bg p-5">
+      <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-qb-orange"><i data-icon="text-cursor-input" class="w-4 h-4"></i>Select it, anywhere</div>
+      <p class="mt-3 text-[14px] leading-relaxed text-qb-black">Select a name in any record, page or set of minutes. A shield button appears above it. Choose <b>Create new</b> and its type, or <b>Add as variation</b> of a name already listed, then <b>Save</b>.</p>
+    </li>
+    <li class="bg-qb-bg p-5">
+      <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-qb-orange"><i data-icon="settings" class="w-4 h-4"></i>From Settings</div>
+      <p class="mt-3 text-[14px] leading-relaxed text-qb-black">Open <b>Settings → Privacy glossary</b> and click <b>New entry</b>. Type the term and pick its type: Name, Organization, Email, Phone, Location, Application or Other. The token is made for you from the type.</p>
+    </li>
+    <li class="bg-qb-bg p-5">
+      <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-qb-orange"><i data-icon="spell-check" class="w-4 h-4"></i>Caught as you type</div>
+      <p class="mt-3 text-[14px] leading-relaxed text-qb-black">In any text box, a listed name is marked as protected while you type. A near miss, a typo or another spelling, is marked too: <i>“Did you mean Hana Okafor? It will be masked as [Redacted_Name_1].”</i></p>
+    </li>
+  </ol>
+
+  <h3 class="mt-14 text-sm font-black uppercase tracking-widest text-qb-black">Keep it in shape</h3>
+  <dl class="mt-4 border-t border-qb-light-grey">
+    <div class="grid sm:grid-cols-[200px_1fr] gap-x-6 gap-y-1 py-4 border-b border-qb-light-grey">
+      <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="list-plus" class="w-3.5 h-3.5 text-qb-orange"></i>Variations</dt>
+      <dd class="text-[15px] leading-relaxed text-qb-black">Open an entry and click the pencil to add nicknames, initials, full names and common misspellings: <span class="font-mono text-[13px]">Hana</span>, <span class="font-mono text-[13px]">H. Okafor</span>, <span class="font-mono text-[13px]">HO</span>. Each one gets the entry's token. Matching ignores capital letters.</dd>
+    </div>
+    <div class="grid sm:grid-cols-[200px_1fr] gap-x-6 gap-y-1 py-4 border-b border-qb-light-grey">
+      <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="search" class="w-3.5 h-3.5 text-qb-orange"></i>Find and edit</dt>
+      <dd class="text-[15px] leading-relaxed text-qb-black">Search the list or filter it by type. Change an entry's term, type, variations or notes from its panel, or delete it with the bin. Changing the type gives it a fresh token.</dd>
+    </div>
+    <div class="grid sm:grid-cols-[200px_1fr] gap-x-6 gap-y-1 py-4 border-b border-qb-light-grey">
+      <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="copy" class="w-3.5 h-3.5 text-qb-orange"></i>One token, one name</dt>
+      <dd class="text-[15px] leading-relaxed text-qb-black">Two entries in a project never share a token: the app will not finish an edit that would make a duplicate, so every token turns back into the right name.</dd>
+    </div>
+    <div class="grid sm:grid-cols-[200px_1fr] gap-x-6 gap-y-1 py-4 border-b border-qb-light-grey">
+      <dt class="text-[10px] font-black uppercase tracking-widest text-qb-dark-grey pt-1 flex items-center gap-2"><i data-icon="shield" class="w-3.5 h-3.5 text-qb-orange"></i>Before you paste</dt>
+      <dd class="text-[15px] leading-relaxed text-qb-black">The glossary masks the words you list, exactly as listed. A name that is not on the list is sent as written. Before you paste a meeting transcript or an email thread, add the people and companies in it.</dd>
+    </div>
+  </dl>
+</section>
+
 <section id="privacy" class="mx-auto max-w-[1280px] px-4 sm:px-8 lg:px-12 pt-28 sm:pt-36">
   <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-qb-black/60 pb-3">
-    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Privacy</h2>
+    <h2 class="text-2xl sm:text-3xl font-black uppercase tracking-widest text-qb-black">Your data</h2>
     <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-qb-dark-grey">Your machine, your Sheet</span>
   </div>
 
@@ -441,15 +522,9 @@
       <div class="border border-qb-light-grey p-5 relative">
         <span class="absolute top-0 right-0 w-2 h-2 bg-qb-orange"></span>
         <p class="text-[10px] font-black uppercase tracking-widest text-qb-grey mb-4 flex items-center gap-2"><i data-icon="eye-off" class="w-3.5 h-3.5"></i>Privacy glossary</p>
-        <p class="text-[15px] leading-relaxed text-qb-black">List the names you'd rather keep to yourself. The app marks them as you type and swaps them for tokens before anything reaches the AI, then swaps them back in the answer.</p>
-        <div class="mt-5 border-l-2 border-qb-light-grey pl-4">
-          <p class="text-[9px] font-black uppercase tracking-widest text-qb-grey mb-1.5">On your screen</p>
-          <p class="text-base text-qb-black">Ask <mark class="pii-mark">Hana Okafor</mark> to approve the budget for <mark class="pii-mark">Kestrel Foods</mark>.</p>
-        </div>
-        <div class="mt-4 border-l-2 border-qb-orange pl-4">
-          <p class="text-[9px] font-black uppercase tracking-widest text-qb-orange mb-1.5">What the AI receives</p>
-          <p class="font-mono text-[12.5px] leading-relaxed text-qb-black">Ask [Redacted_Name_1] to approve the budget for [Redacted_Organization_1].</p>
-        </div>
+        <p class="text-[15px] leading-relaxed text-qb-black">Names you list are swapped for tokens before anything reaches the AI, and swapped back on your screen. Each project keeps its own list.</p>
+        <p class="mt-4 font-mono text-[12.5px] leading-relaxed text-qb-black border-l-2 border-qb-orange pl-4">Ask [Redacted_Name_1] to approve the budget.</p>
+        <a href="#glossary" class="mt-5 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-qb-orange hover:text-qb-black transition-colors">How to add and manage names<i data-icon="arrow-right" class="w-3.5 h-3.5"></i></a>
       </div>
     </div>
   </div>

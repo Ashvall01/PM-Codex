@@ -284,7 +284,9 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
   return (
     <div className="h-full flex bg-qb-bg font-sans">
       {/* List View */}
-      <div className={`flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${realActiveItem ? 'lg:mr-[600px]' : ''} transition-all duration-300`}>
+      {/* Rows lay out for the list's own width, not the screen's: see the
+          same note in TasksTracker.tsx. */}
+      <div className={`@container/list flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${realActiveItem ? 'lg:mr-[var(--tray-w,600px)]' : ''} transition-all duration-300`}>
         <PageHeader
           title="Risks"
           stats={archived ? <span>{projectRisks.length} in the archive</span> : <>
@@ -433,7 +435,7 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
                                 useAcrStore.getState().setActiveAcrChangeId(null);
                               }
                             }}
-                            className={`cursor-pointer group flex flex-col md:flex-row md:items-center justify-between py-4 border-b border-qb-light-grey transition-all duration-300 hover:bg-black/5 px-4 ${
+                            className={`cursor-pointer group flex flex-col @min-[860px]/list:flex-row @min-[860px]/list:items-center justify-between py-4 border-b border-qb-light-grey transition-all duration-300 hover:bg-black/5 px-4 ${
                               realActiveItem?.id === item.id ? 'bg-qb-box-bg' : ''
                             } ${
                               (item as any).isFocusedChange ? 'ring-2 ring-qb-orange bg-qb-orange/5 animate-pulse' : ''
@@ -445,9 +447,11 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
                               (item as any).isAcrProposedDelete ? 'border-l-4 border-qb-magenta bg-qb-magenta/5 opacity-75 animate-pulse' : ''
                             }`}
                           >
-                            <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
+                            {/* The title keeps at least 10rem; the labels wrap below it
+                                rather than squeeze it to nothing. */}
+                            <div className="flex flex-wrap @min-[860px]/list:flex-nowrap items-center gap-x-4 gap-y-1.5 flex-1 min-w-0 pr-4">
                               <span className="text-xs font-mono font-bold text-qb-grey shrink-0 w-16 truncate">{item.riskId || '--'}</span>
-                              <h3 className={`text-lg tracking-wide truncate ${realActiveItem?.id === item.id ? 'font-black text-qb-black' : 'font-medium text-qb-dark-grey'} ${(item as any).isAcrProposedDelete ? 'line-through text-qb-grey' : ''}`}>
+                              <h3 className={`text-lg tracking-wide truncate flex-1 min-w-[10rem] ${realActiveItem?.id === item.id ? 'font-black text-qb-black' : 'font-medium text-qb-dark-grey'} ${(item as any).isAcrProposedDelete ? 'line-through text-qb-grey' : ''}`}>
                                 {item.projectSpecificDescription || item.riskDescription || 'Empty Risk Description'}
                               </h3>
                               {(item as any).isAcrProposedAdd && (
@@ -463,7 +467,7 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
                               )}
                             </div>
                             
-                            <div className="flex items-center gap-4 shrink-0 mt-2 md:mt-0">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 shrink-0 mt-2 @min-[860px]/list:mt-0 @min-[860px]/list:flex-nowrap">
                               {item.targetResolutionDate && (() => {
                                 const due = dueState(item.targetResolutionDate, item.status === 'Mitigated');
                                 const tag = dueTag(item.targetResolutionDate, due);
@@ -514,19 +518,19 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
 
       {/* Details / Edit Panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-full lg:w-[600px] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-40 lg:z-30 shadow-2xl lg:shadow-none ${realActiveItem ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`@container/tray fixed top-0 right-0 h-full w-full lg:w-[var(--tray-w,600px)] bg-qb-bg lg:border-l-4 border-l-0 border-qb-black transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col z-40 lg:z-30 shadow-2xl lg:shadow-none ${realActiveItem ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {realActiveItem && (
           <>
-            <header className="flex justify-between items-center px-6 lg:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
+            <header className="flex justify-between items-center gap-3 px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 border-b border-qb-light-grey bg-transparent shrink-0 relative">
               <div className="absolute bottom-0 left-0 h-0.5 w-12 bg-qb-orange"></div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 min-w-0">
                 <span className="text-[10px] font-bold text-qb-grey uppercase tracking-widest leading-none">RISK DETAILS</span>
-                <h2 className="text-2xl font-black text-qb-black uppercase tracking-widest mt-1">
+                <h2 className="text-lg @min-[540px]/tray:text-2xl font-black text-qb-black uppercase tracking-widest mt-1">
                   {effectiveIsEditing ? 'EDIT RISK' : 'VIEW RISK'}
                 </h2>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 @min-[540px]/tray:gap-4 shrink-0">
                 {!(realActiveItem as any).isAcrProposedAdd && !(realActiveItem as any).isAcrProposedUpdate && !(realActiveItem as any).isAcrProposedDelete && (
                   <>
                     {/* Archive sits before delete: the gentler of the two first. */}
@@ -564,7 +568,7 @@ const Risks: React.FC<RisksProps> = ({ archived = false }) => {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
+            <div className="flex-1 overflow-y-auto px-6 @min-[540px]/tray:px-12 py-6 lg:py-8 flex flex-col gap-10 bg-transparent no-scrollbar relative">
               {/* A removal is the one change no field on this screen can
                   show, because it changes no field. Everything else is
                   visible on the fields themselves. */}

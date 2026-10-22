@@ -69,20 +69,22 @@ These live in files this agent does own. They are three lines in total. Leave th
    argument that defaults to `'gemini'`. It records which assistant proposed the request. Do not
    remove it, and do not change the default.
 
-2. **The origin guard in `src/components/layout/AISidebar.tsx`.** `handleApproveAcr` and
-   `handleRejectAcr` each return early when the request's origin is `'claude'`, before building the
-   feedback message. Without it, signing off a proposal Claude made sends Gemini a message about
+2. **The origin guard in `src/components/layout/AISidebar.tsx`.** `handleDecideAcr` (every
+   sign-off from the review panel: all, selected, a group or one line) returns early when the
+   request's origin is `'claude'`, before building the feedback message. Without it, signing off a proposal Claude made sends Gemini a message about
    work Gemini never did, and Gemini answers with something confused. The guard reads the field
    defensively and needs no import, so it is safe to keep through a rewrite.
 
 3. **The session filter on the review panel in `src/components/layout/AISidebar.tsx`.**
    `activeAcr` matches on the session id as well as the request id, and lets a request whose origin
-   is `'claude'` through regardless. Without the session test, one open request appears in every
+   is `'claude'` through regardless. It also matches on the project: a request is reviewed in the
+   project it belongs to. Without the session test, one open request appears in every
    chat, old conversations included. Without the `'claude'` exemption, a request from the bridge
    becomes unreachable, because it belongs to no chat.
 
 4. **`ClaudeProposalBar` in `src/components/layout/AppLayout.tsx`.**
-   The only way to reach a change request the bridge filed. Deleting it does not break the build; it
+   The only way to reach a change request the bridge filed — in the open project, and (since
+   22 Oct 2026) in any other project, which it links to. Deleting it does not break the build; it
    makes those requests invisible, with nothing to say so.
 
 Everything else in `AISidebar.tsx`, `AppLayout.tsx` and `acrStore.ts` is yours.
@@ -149,8 +151,29 @@ of the above.
 ## Carrying out an approved change — one executor, no copies
 
 `src/services/acrExecutor.ts` is the only place a proposed change is applied.
-Three callers use it: Gemini's review modal, the review panel's SIGN OFF button,
-and the change card in the chat.
+Two callers use it: Gemini's review modal, and `src/services/acrSignOff.ts`,
+which every sign-off button goes through (the review panel's footer, a group,
+one line, and the APPROVE / REJECT on Gemini's card in the chat).
+
+## Signing off part of a request — `src/services/acrSignOff.ts`
+
+Since 22 Oct 2026 the user approves or rejects lines — all, the ticked ones, a
+group, or one — and the rest stay open. `signOffAcrLines` applies the lines
+(against the REQUEST's project, `acr.projectId`, never the open one) and
+`decideAcrChanges` moves them from `changes` to `decided`. So `changes` is
+always the open lines, and every module that draws a pending request keeps
+working unchanged. A request closes when its last open line is decided.
+
+- An unticked line is **not declined**: it stays open. Do not strike it
+  through or call it "declined" anywhere.
+- Do not call `setAcrStatus` to sign off. It skips the executor and the
+  `decided` bookkeeping the bridge reports from.
+- `createAcr` matches an open request on session, origin AND project. Claude
+  files every request under one session id; without the project, a proposal
+  for a second project was folded into the first one's request.
+- `group` on a line is the heading the assistant gave it (`changeGroup` in the
+  arguments, lifted out by `takeChangeGroup`). `utils/acrGroups.ts` sorts lines
+  into sections for the panel.
 
 **Do not put an action's code back inside `AISidebar.tsx`.** That code existed
 three times over until 8 Sep, and every difference between the copies was a

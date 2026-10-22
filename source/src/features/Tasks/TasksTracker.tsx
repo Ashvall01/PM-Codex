@@ -414,7 +414,7 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
                               useAcrStore.getState().setActiveAcrChangeId(null);
                             }
                           }}
-                          className={`cursor-pointer group flex items-center justify-between py-4 border-b border-qb-light-grey transition-all duration-300 hover:bg-black/5 px-4 ${
+                          className={`cursor-pointer group flex flex-col gap-2 @min-[1040px]/list:flex-row @min-[1040px]/list:items-center @min-[1040px]/list:gap-0 justify-between py-4 border-b border-qb-light-grey transition-all duration-300 hover:bg-black/5 px-4 ${
                             realActiveItem?.id === item.id ? 'bg-qb-box-bg' : ''
                           } ${
                             item.isFlagged ? 'bg-amber-500/10 border-l-4 border-amber-500 hover:bg-amber-500/15' : ''
@@ -428,7 +428,9 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
                             (item as any).isAcrProposedDelete ? 'border-l-4 border-qb-magenta bg-qb-magenta/5 opacity-75' : ''
                           }`}
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0 mr-4">
+                          {/* Narrow list: the title takes the first line whole, the
+                              labels wrap onto the next ones. Wide: one line. */}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 w-full min-w-0 @min-[1040px]/list:flex-nowrap @min-[1040px]/list:flex-1 @min-[1040px]/list:w-auto @min-[1040px]/list:mr-4">
                             {!archived && !(item as any).isAcrProposedAdd && (
                               <button
                                 type="button"
@@ -464,7 +466,7 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
                                 </span>
                               );
                             })()}
-                            <h3 className={`text-lg tracking-wide truncate ${realActiveItem?.id === item.id ? 'font-black text-qb-black' : 'font-medium text-qb-dark-grey'} ${(item as any).isAcrProposedDelete ? 'line-through text-qb-grey' : ''}`}>
+                            <h3 className={`text-lg tracking-wide truncate max-w-full @max-[1040px]/list:order-first @max-[1040px]/list:basis-full @min-[1040px]/list:min-w-[8rem] ${realActiveItem?.id === item.id ? 'font-black text-qb-black' : 'font-medium text-qb-dark-grey'} ${(item as any).isAcrProposedDelete ? 'line-through text-qb-grey' : ''}`}>
                               <Highlight text={item.description || 'Empty Description'} needles={needles} />
                             </h3>
                             {(() => {
@@ -490,7 +492,7 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
                                 : (linkedAct.activity || linkedAct.subActivity);
                               return (
                                 <span 
-                                  className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 bg-black/5 border border-qb-light-grey text-qb-dark-grey max-w-[220px] truncate shrink-0"
+                                  className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 bg-black/5 border border-qb-light-grey text-qb-dark-grey max-w-[220px] truncate min-w-0 shrink"
                                   title={displayTitle}
                                 >
                                   {displayTitle}
@@ -515,7 +517,7 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-6">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 @min-[1040px]/list:flex-nowrap @min-[1040px]/list:shrink-0 @min-[1300px]/list:gap-6">
                             {item.estimatedResolutionDate && (() => {
                               // Late and due-this-week dates stand out; the rest stay quiet.
                               const due = dueState(item.estimatedResolutionDate, archived || ['Done', 'Dropped'].includes(item.status));
@@ -566,7 +568,11 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
   return (
     <div className="h-full flex bg-qb-bg font-sans">
       {/* List View */}
-      <div className={`flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${realActiveItem ? 'lg:mr-[600px]' : ''} transition-all duration-300`}>
+      {/* @container/list: rows lay out for the width the list actually has.
+          With the review panel open on the left and the detail tray on the
+          right, that can be a third of the screen; a row laid out for the
+          screen then had its labels run over each other (22 Oct 2026). */}
+      <div className={`@container/list flex-1 flex flex-col pt-4 sm:pt-8 px-4 sm:pl-12 sm:pr-6 overflow-y-auto ${realActiveItem ? 'lg:mr-[var(--tray-w,600px)]' : ''} transition-all duration-300`}>
         <PageHeader
           title="Tasks & Issues"
           stats={archived ? <span>{projectTasks.length} in the archive</span> : <>

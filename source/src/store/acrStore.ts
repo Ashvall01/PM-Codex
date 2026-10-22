@@ -19,6 +19,20 @@ export interface ACRChange {
   proposedArgs?: any;
   /** When the user last edited this line's arguments. Absent: never edited. */
   userEditedAt?: string;
+  /**
+   * A short heading the assistant gave a set of related lines ("MoM 22 Oct —
+   * follow-ups"). The review panel draws one section per heading. Sent as
+   * `changeGroup` in the arguments and lifted out here, so it never reaches
+   * the executor or a record. Absent: the line sits under "Other changes".
+   */
+  group?: string;
+  /**
+   * Set once the line is signed off on its own. A decided line moves from
+   * `changes` to `decided`, so every module that draws `changes` keeps showing
+   * only what is still open. See decideAcrChanges.
+   */
+  decision?: 'applied' | 'rejected';
+  decidedAt?: string;
 }
 
 /**
@@ -65,9 +79,40 @@ export interface AssistantChangeRequest {
   projectId: string;
   origin?: ACROrigin;
   status: 'pending' | 'approved' | 'rejected';
+  /**
+   * The lines still open. On a request closed before 22 Oct 2026 (one sign-off
+   * for the whole request) these are every line, `approved` saying which were
+   * applied; since then a request closes when its last open line is decided,
+   * so a closed request has none left here and its lines are in `decided`.
+   */
   changes: ACRChange[];
+  /**
+   * Lines already signed off, applied or rejected, in the order they were
+   * decided. The user can approve part of a request and keep the rest open
+   * to talk over with the assistant (22 Oct 2026).
+   */
+  decided?: ACRChange[];
   createdAt: string;
   updatedAt?: string;
+}
+
+/**
+ * Lifts the group heading out of a proposal's arguments.
+ *
+ * Both assistants send it as `changeGroup`, beside `changeTitle`. It describes
+ * the review list, not the record, so it is kept on the line and never stored
+ * in the arguments the executor applies.
+ */
+export function takeChangeGroup(args: any): { args: any; group?: string } {
+  if (!args || typeof args !== 'object' || !('changeGroup' in args)) return { args };
+  const { changeGroup, ...rest } = args;
+  const group = typeof changeGroup === 'string' ? changeGroup.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+  return { args: rest, group: group || undefined };
+}
+
+/** Every line a request ever held: open, then decided. */
+export function allAcrLines(acr: AssistantChangeRequest): ACRChange[] {
+  return [...(acr.changes || []), ...(acr.decided || [])];
 }
 
 /** First words of a long value, for a one-line title. */
@@ -184,6 +229,12 @@ interface AcrState {
   isChatHiddenDuringReview: boolean;
   
   createAcr: (projectId: string, sessionId: string, rawChanges: { callId?: string; name: string; args: any }[], origin?: ACROrigin) => string | null;
+  /**
+   * Moves the named open lines to `decided`. Nothing is applied here: the
+   * caller runs the executor for applied lines first (services/acrSignOff.ts).
+   * The request closes when no open line is left. Returns the moved lines.
+   */
+  decideAcrChanges: (acrId: string, changeIds: string[], decision: 'applied' | 'rejected') => ACRChange[];
   updateAcrChangeApproval: (acrId: string, changeId: string, approved: boolean) => void;
   updateAcrChange: (acrId: string, changeId: string, updates: Partial<ACRChange>) => void;
   updateAllChangesApproval: (acrId: string, approved: boolean) => void;
@@ -191,7 +242,7 @@ interface AcrState {
   setActiveAcrId: (id: string | null) => void;
   setActiveAcrChangeId: (id: string | null) => void;
   setAttachedAcrChange: (change: ACRChange | null) => void;
-  getPendingAcrForSession: (sessionId: string) => AssistantChangeRequest | undefined;
+  getPendingAcrForSession: (sessionId: string, projectId?: string | null) => AssistantChangeRequest | undefined;
   deleteAcr: (acrId: string) => void;
   setIsMouseOverSidebar: (over: boolean) => void;
   setIsChatHiddenDuringReview: (hidden: boolean) => void;
@@ -213,15 +264,22 @@ export const useAcrStore = create<AcrState>()(
         // Origin is part of the match: a Claude proposal must never be folded
         // into a request Gemini is still holding open, even if the two ever
         // share a session id.
+        //
+        // So is the project. Claude files every proposal under one fixed
+        // session id, so until 22 Oct 2026 a proposal for a second project was
+        // folded into the request still pending in the first: it showed only
+        // there, and signing it off there applied it to the wrong project.
         const existingAcrIdx = acrs.findIndex(
-          acr => acr.sessionId === sessionId && (acr.origin || 'gemini') === origin && acr.status === 'pending'
+          acr => acr.sessionId === sessionId && acr.projectId === projectId && (acr.origin || 'gemini') === origin && acr.status === 'pending'
         );
 
         if (existingAcrIdx !== -1) {
           const existingAcr = acrs[existingAcrIdx];
           const updatedChanges = [...existingAcr.changes];
 
-          rawChanges.forEach(rc => {
+          rawChanges.forEach(raw => {
+            const { args: liftedArgs, group } = takeChangeGroup(raw.args);
+            const rc = { ...raw, args: liftedArgs };
             if (rc.name === 'discardPendingACRChange') {
                const changeIdToDiscard = rc.args.changeId;
                const idx = updatedChanges.findIndex(c => c.id === changeIdToDiscard);
@@ -270,7 +328,8 @@ export const useAcrStore = create<AcrState>()(
               updatedChanges[existingChangeIdx] = {
                 ...existingChange,
                 args: { ...existingChange.args, ...rc.args },
-                changeTitle: getChangeTitle(rc.name, { ...existingChange.args, ...rc.args })
+                changeTitle: getChangeTitle(rc.name, { ...existingChange.args, ...rc.args }),
+                ...(group ? { group } : {}),
               };
               return;
             }
@@ -283,13 +342,32 @@ export const useAcrStore = create<AcrState>()(
               name: rc.name,
               args: rc.args,
               changeTitle: getChangeTitle(rc.name, rc.args),
+              ...(group ? { group } : {}),
             });
           });
 
           const newAcrs = [...acrs];
           
-          if (updatedChanges.length === 0) {
+          if (updatedChanges.length === 0 && (existingAcr.decided || []).length === 0) {
             newAcrs.splice(existingAcrIdx, 1);
+            set((state) => ({
+              acrs: newAcrs,
+              activeAcrId: state.activeAcrId === existingAcr.id ? null : state.activeAcrId,
+              activeAcrChangeId: state.activeAcrId === existingAcr.id ? null : state.activeAcrChangeId,
+            }));
+            return null;
+          }
+
+          // The last open line withdrawn from a request that already had lines
+          // signed off: the request is finished, with what was decided.
+          if (updatedChanges.length === 0) {
+            const decided = existingAcr.decided || [];
+            newAcrs[existingAcrIdx] = {
+              ...existingAcr,
+              changes: [],
+              status: decided.some((d) => d.decision === 'applied') ? 'approved' : 'rejected',
+              updatedAt: new Date().toISOString(),
+            };
             set((state) => ({
               acrs: newAcrs,
               activeAcrId: state.activeAcrId === existingAcr.id ? null : state.activeAcrId,
@@ -312,14 +390,18 @@ export const useAcrStore = create<AcrState>()(
           return existingAcr.id;
         }
 
-        const newChanges = rawChanges.filter(rc => rc.name !== 'discardPendingACRChange').map((rc) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          callId: rc.callId,
-          approved: true, // Default to true so user can uncheck
-          name: rc.name,
-          args: rc.args,
-          changeTitle: getChangeTitle(rc.name, rc.args),
-        }));
+        const newChanges: ACRChange[] = rawChanges.filter(rc => rc.name !== 'discardPendingACRChange').map((raw) => {
+          const { args, group } = takeChangeGroup(raw.args);
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            callId: raw.callId,
+            approved: true, // Default to true so user can uncheck
+            name: raw.name,
+            args,
+            changeTitle: getChangeTitle(raw.name, args),
+            ...(group ? { group } : {}),
+          };
+        });
 
         if (newChanges.length === 0) {
           return null;
@@ -342,6 +424,37 @@ export const useAcrStore = create<AcrState>()(
           activeAcrId: newId, // Automatically focus/review the newly created ACR
         });
         return newId;
+      },
+
+      decideAcrChanges: (acrId, changeIds, decision) => {
+        const ids = new Set(changeIds);
+        const moved: ACRChange[] = [];
+        const now = new Date().toISOString();
+        let closed = false;
+        set((state) => {
+          const acrs = state.acrs.map((acr) => {
+            if (acr.id !== acrId || acr.status !== 'pending') return acr;
+            const open: ACRChange[] = [];
+            for (const c of acr.changes) {
+              if (ids.has(c.id)) moved.push({ ...c, approved: decision === 'applied', decision, decidedAt: now });
+              else open.push(c);
+            }
+            if (!moved.length) return acr;
+            const decided = [...(acr.decided || []), ...moved];
+            const status: AssistantChangeRequest['status'] = open.length
+              ? 'pending'
+              : decided.some((d) => d.decision === 'applied') ? 'approved' : 'rejected';
+            closed = status !== 'pending';
+            return { ...acr, changes: open, decided, status, updatedAt: now };
+          });
+          const focusGone = !!state.activeAcrChangeId && ids.has(state.activeAcrChangeId);
+          return {
+            acrs,
+            ...(closed && state.activeAcrId === acrId ? { activeAcrId: null, activeAcrChangeId: null } : {}),
+            ...(focusGone ? { activeAcrChangeId: null } : {}),
+          };
+        });
+        return moved;
       },
 
       updateAcrChangeApproval: (acrId, changeId, approved) => {
@@ -470,8 +583,9 @@ export const useAcrStore = create<AcrState>()(
         set({ attachedAcrChange: change });
       },
 
-      getPendingAcrForSession: (sessionId) => {
-        return get().acrs.find((acr) => acr.sessionId === sessionId && acr.status === 'pending');
+      getPendingAcrForSession: (sessionId, projectId) => {
+        return get().acrs.find((acr) =>
+          acr.sessionId === sessionId && acr.status === 'pending' && (!projectId || acr.projectId === projectId));
       },
 
       deleteAcr: (acrId) => {

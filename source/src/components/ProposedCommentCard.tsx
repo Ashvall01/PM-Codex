@@ -25,7 +25,7 @@ export const ProposedCommentCard: React.FC<ProposedCommentCardProps> = ({ change
   return (
     <div className={`border-l-4 border-qb-cyan bg-qb-cyan/5 p-4 relative ${declined ? 'opacity-50' : ''}`}>
       <div className="text-[9px] font-black uppercase tracking-widest text-qb-cyan mb-1.5">
-        {isEdit ? 'Proposed Comment Edit' : 'Proposed Comment'}{declined ? ' · Declined' : ''}
+        {isEdit ? 'Proposed Comment Edit' : 'Proposed Comment'}{declined ? ' · Not selected' : ''}
       </div>
       {isEdit && (
         <div className="mb-2">

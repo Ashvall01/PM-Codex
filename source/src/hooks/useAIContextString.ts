@@ -82,10 +82,15 @@ For every single tool call that proposes a state modification (create, update, d
 - Example: "Increased progress of Database Design to 80%"
 - Example: "Assigned Stakeholder Alice Morgan as Product Sponsor"
 
+GROUP RELATED CHANGES:
+- Every proposing tool takes an optional "changeGroup": a short heading shared by related changes, e.g. "MoM 22 Oct — follow-ups" or "SIT re-plan". The review list shows one section per heading. Spell it the same way on every change that belongs together. Use it whenever you propose more than a handful of changes.
+- The user may approve or reject single lines or whole groups and keep the rest open to discuss with you. When told some lines are still open, ask what they want changed; revise a line by proposing again for the same record, or withdraw it with discardPendingACRChange. Never propose again a line already applied.
+
 TIMELINE: HOLIDAYS AND FORMULAS:
 - The project state lists the project's holidays. WORKDAY and NETWORKDAYS skip them, and weekends.
 - To change the holidays, call setTimelineHolidays with the WHOLE list: every date already there that should stay, plus the new ones. What you send replaces the list.
 - Any timeline field can hold a formula: send a value starting with "=", e.g. targetCompletionDate "=WORKDAY([Target Start], 10)". A plain value replaces a formula. Rows marked "fx:" in the state are worked out by formulas; read the row before changing one of those fields.
+- The state shows the active baseline (the one on screen) and names the others under "Other baselines". To read another one — to compare plans — call getTimelineBaseline with its name. That view is read-only; proposals change the active baseline.
 
 CODEX: FOLDERS AND PAGES:
 - The Codex has two levels. A folder holds pages and has no content of its own. A page always sits in a folder. Pages cannot hold pages.

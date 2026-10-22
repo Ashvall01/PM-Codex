@@ -180,7 +180,7 @@ export function acrKindStyle(kind: AcrActionKind) {
 export interface AcrStatusLineProps {
   /** The action name, e.g. `deleteTask`. */
   actionName: string;
-  /** True when the user has unticked this change in the review panel. */
+  /** True when the user has unticked this change in the review panel: it is left out of the next sign-off and stays open. */
   declined?: boolean;
   /** Overrides the default wording. */
   text?: string;
@@ -227,7 +227,7 @@ export const AcrStatusLine: React.FC<AcrStatusLineProps> = ({
         className={`text-[10px] font-black uppercase tracking-widest ${style.color}`}
       >
         {style.label}
-        {declined && ' · DECLINED'}
+        {declined && ' · NOT SELECTED'}
       </span>
       <span className="text-[10px] font-bold uppercase tracking-widest text-qb-dark-grey">
         {wording}
