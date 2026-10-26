@@ -4407,7 +4407,7 @@ Acknowledge briefly what was ${decision === "applied" ? "applied" : "rejected"},
           </div>
 
           {/* List of changes, under the headings the assistant gave them */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+          <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-3">
             {(() => {
               const renderCard = (change: ACRChange) => (
                 <AcrChangeCard
@@ -4426,7 +4426,11 @@ Acknowledge briefly what was ${decision === "applied" ? "applied" : "rejected"},
 
               // No headings at all: the plain list, exactly as before.
               if (!hasNamedGroups(activeAcr.changes)) {
-                return activeAcr.changes.map(renderCard);
+                return (
+                  <div className="pt-4 flex flex-col gap-3">
+                    {activeAcr.changes.map(renderCard)}
+                  </div>
+                );
               }
 
               return groupAcrLines(activeAcr.changes).map((group) => {
@@ -4437,7 +4441,7 @@ Acknowledge briefly what was ${decision === "applied" ? "applied" : "rejected"},
                 const all = selected === group.changes.length;
                 return (
                   <section key={groupKey} className="flex flex-col gap-2" aria-label={group.title}>
-                    <div className="flex items-center gap-2 border-b border-qb-black/60 pb-1.5 pt-1 sticky top-0 bg-qb-bg z-10">
+                    <div className="flex items-center gap-2 border-b border-qb-black/60 pt-4 pb-2 -mx-4 px-4 sticky top-0 bg-qb-bg z-20">
                       <input
                         type="checkbox"
                         aria-label={`Select every line in ${group.title}`}
@@ -4662,7 +4666,7 @@ const AcrChangeCard: React.FC<AcrChangeCardProps> = ({
       ref={cardRef}
       onClick={() => handleFocusChange(change)}
       onMouseEnter={() => setActiveAcrChangeId(change.id)}
-      className={`border p-4 transition-all duration-200 cursor-pointer flex gap-3 ${
+      className={`border p-4 scroll-mt-16 transition-all duration-200 cursor-pointer flex gap-3 ${
         isFocused
           ? "border-qb-orange bg-qb-orange/5 shadow-sm"
           : "border-qb-light-grey hover:border-qb-black bg-transparent"
