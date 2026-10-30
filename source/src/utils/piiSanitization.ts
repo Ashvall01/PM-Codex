@@ -1,68 +1,37 @@
 import { usePIIStore, PIIEntry } from '../store/piiStore';
 import { Content, Part } from '@google/genai';
+import { replaceWholeWords, MaskPair } from './piiMasking';
 
 /**
- * Escapes special characters in a string to be used safely in a RegExp.
- */
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Sanitizes a single string by replacing original terms with their placeholders.
+ * Sanitizes a single string by replacing original terms (and their variations)
+ * with their placeholders. Whole words only: a stakeholder named "Rose" never
+ * touches "arose". See piiMasking.ts.
  */
 export function sanitizeString(text: string, entries: PIIEntry[]): string {
   if (!text) return text;
-  let sanitizedText = text;
-  
-  interface MatchItem {
-    term: string;
-    placeholder: string;
-  }
-
-  const matches: MatchItem[] = [];
+  const pairs: MaskPair[] = [];
   for (const entry of entries) {
-    if (entry.placeholder) {
-      if (entry.originalTerm) {
-        matches.push({ term: entry.originalTerm, placeholder: entry.placeholder });
-      }
-      if (entry.variations && Array.isArray(entry.variations)) {
-        entry.variations.forEach(v => {
-          if (v && v.trim()) {
-            matches.push({ term: v.trim(), placeholder: entry.placeholder });
-          }
-        });
+    if (!entry.placeholder) continue;
+    if (entry.originalTerm) pairs.push({ find: entry.originalTerm, replace: entry.placeholder });
+    if (Array.isArray(entry.variations)) {
+      for (const v of entry.variations) {
+        if (v && v.trim()) pairs.push({ find: v.trim(), replace: entry.placeholder });
       }
     }
   }
-
-  // Sort matches by term length descending to match longer phrases first
-  const sortedMatches = matches.sort((a, b) => b.term.length - a.term.length);
-
-  for (const match of sortedMatches) {
-    const regex = new RegExp(escapeRegExp(match.term), 'gi');
-    sanitizedText = sanitizedText.replace(regex, match.placeholder);
-  }
-  return sanitizedText;
+  return replaceWholeWords(text, pairs, true);
 }
 
 /**
- * Reconstructs a single string by replacing placeholders with their original terms.
+ * Reconstructs a single string by replacing placeholders with their original
+ * terms. Case-sensitive, whole words only, one pass.
  */
 export function reconstructString(text: string, entries: PIIEntry[]): string {
   if (!text) return text;
-  let reconstructedText = text;
-
-  // Sort entries by placeholder length descending just in case
-  const sortedEntries = [...entries].sort((a, b) => b.placeholder.length - a.placeholder.length);
-
-  for (const entry of sortedEntries) {
-    if (entry.originalTerm && entry.placeholder) {
-      const regex = new RegExp(escapeRegExp(entry.placeholder), 'g');
-      reconstructedText = reconstructedText.replace(regex, entry.originalTerm);
-    }
-  }
-  return reconstructedText;
+  const pairs: MaskPair[] = entries
+    .filter((e) => e.originalTerm && e.placeholder)
+    .map((e) => ({ find: e.placeholder, replace: e.originalTerm }));
+  return replaceWholeWords(text, pairs, false);
 }
 
 /**
