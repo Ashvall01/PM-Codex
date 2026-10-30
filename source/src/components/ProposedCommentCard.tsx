@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { formatAcrValue } from '../utils/acrDiff';
+import { useAcrStore } from '../store/acrStore';
 
 /**
  * A proposed comment, drawn where comments live — one card for every module.
@@ -22,8 +23,19 @@ export const ProposedCommentCard: React.FC<ProposedCommentCardProps> = ({ change
   const original = isEdit ? (comments || []).find((c) => c.id === commentId) : undefined;
   const declined = change?.approved === false;
 
+  // Clicking this proposal in the review panel opens the record; bring the
+  // comment itself into view, since the comments sit at the bottom of the tray.
+  const activeAcrChangeId = useAcrStore((s) => s.activeAcrChangeId);
+  const isFocused = !!change?.id && activeAcrChangeId === change.id;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isFocused) return;
+    const t = setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120);
+    return () => clearTimeout(t);
+  }, [isFocused]);
+
   return (
-    <div className={`border-l-4 border-qb-cyan bg-qb-cyan/5 p-4 relative ${declined ? 'opacity-50' : ''}`}>
+    <div ref={ref} className={`border-l-4 border-qb-cyan bg-qb-cyan/5 p-4 relative ${declined ? 'opacity-50' : ''} ${isFocused ? 'ring-2 ring-qb-orange' : ''}`}>
       <div className="text-[9px] font-black uppercase tracking-widest text-qb-cyan mb-1.5">
         {isEdit ? 'Proposed Comment Edit' : 'Proposed Comment'}{declined ? ' · Not selected' : ''}
       </div>

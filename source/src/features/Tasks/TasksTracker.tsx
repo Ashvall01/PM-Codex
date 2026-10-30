@@ -193,7 +193,11 @@ export const TasksTracker: React.FC<TasksTrackerProps> = ({ archived = false }) 
 
   React.useEffect(() => {
     if (activeAcrChangeId) {
-      const found = projectTasks.find(t => t.acrChangeId === activeAcrChangeId);
+      // acrChangeId holds only ONE change per record (the edit, else the first
+      // comment), so a comment proposal is matched through its comment list too.
+      const found = projectTasks.find(t =>
+        t.acrChangeId === activeAcrChangeId ||
+        ((t as any).acrCommentChanges || []).some((c: any) => c.id === activeAcrChangeId));
       if (found) {
         setActiveItemId(found.id);
         

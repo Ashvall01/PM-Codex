@@ -9,7 +9,7 @@ import { EditableField } from '../../components/EditableField';
 import { DateVisualizer } from '../../components/DateVisualizer';
 import { format } from 'date-fns';
 import { useAcrStore } from '../../store/acrStore';
-import { enrichWithAcr, acrFieldProps, acrUnshownDiffs } from '../../utils/acrDiff';
+import { enrichWithAcr, acrFieldProps, acrUnshownDiffs, acrTargetId } from '../../utils/acrDiff';
 import { AcrStatusLine, AcrDiffList } from '../../components/AcrDiffList';
 import { ProposedCommentCard } from '../../components/ProposedCommentCard';
 import { activeOnly } from '../../utils/archive';
@@ -226,7 +226,11 @@ export default function Deliverables({ archived = false }: DeliverablesProps) {
 
   React.useEffect(() => {
     if (activeAcrChangeId) {
-      const found = projectDeliverables.find(d => d.acrChangeId === activeAcrChangeId);
+      // acrChangeId holds only ONE change per record (the edit, else the first
+      // comment), so a comment proposal is matched through its comment list too.
+      const found = projectDeliverables.find(d =>
+        d.acrChangeId === activeAcrChangeId ||
+        ((d as any).acrCommentChanges || []).some((c: any) => c.id === activeAcrChangeId));
       if (found) {
         setActiveItemId(found.id);
         // A proposal is shown in the list it belongs to, not behind a search.
@@ -243,6 +247,16 @@ export default function Deliverables({ archived = false }: DeliverablesProps) {
               cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
           }, 50);
+        }
+      } else if (!archived) {
+        // The list shows one folder at a time. A proposal aimed at a deliverable
+        // in another folder found nothing, so no tray opened. Step into the
+        // folder that holds it; the list then rebuilds and this runs again.
+        const change = acr?.changes.find(c => c.id === activeAcrChangeId);
+        const targetId = change ? acrTargetId(change) : undefined;
+        const target = targetId ? deliverables.find(d => String(d.id) === String(targetId) && d.projectId === activeProjectId) : undefined;
+        if (target && !(target as any).isArchived && (target.parentId || null) !== (currentParentId || null)) {
+          setCurrentParentId(target.parentId || null);
         }
       }
     }

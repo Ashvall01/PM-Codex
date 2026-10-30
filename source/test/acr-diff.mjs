@@ -209,5 +209,27 @@ ok('a comment edit lands on its own record, with the comment proposals',
 ok('a flag proposal shows on its record as an edit holding the proposed flag',
    editedRows[1].isAcrProposedUpdate === true && editedRows[1].isFlagged === true && editedRows[1].acrOriginal.isFlagged === undefined);
 
+// -------------------------------------------- finding the record of a comment
+// The modules open a record when its proposal is clicked in the review panel.
+// `acrChangeId` names ONE change per record, so a second comment, or a comment
+// beside an edit, is reachable only through `acrCommentChanges`.
+const focusRows = enrichWithAcr(
+  [{ id: 't1', title: 'One' }, { id: 't2', title: 'Two' }],
+  { id: 'acr-f', changes: [
+    { id: 'u1', name: 'updateTask', approved: true, args: { id: 't1', title: 'One v2' } },
+    { id: 'k1', name: 'addTaskComment', approved: true, args: { taskId: 't1', text: 'First' } },
+    { id: 'k2', name: 'addTaskComment', approved: true, args: { taskId: 't2', text: 'Second' } },
+    { id: 'k3', name: 'addTaskComment', approved: true, args: { taskId: 't2', text: 'Third' } },
+  ] },
+  { update: ['updateTask'], comment: ['addTaskComment', 'editTaskComment'] },
+  'k3',
+);
+const recordFor = (id) => focusRows.find((r) => r.acrChangeId === id || (r.acrCommentChanges || []).some((c) => c.id === id));
+ok('a comment beside an edit is not what acrChangeId names', focusRows[0].acrChangeId === 'u1');
+ok('a second comment on a record is not what acrChangeId names', focusRows[1].acrChangeId === 'k2');
+ok('every comment proposal finds its record through the comment list',
+   recordFor('k1')?.id === 't1' && recordFor('k2')?.id === 't2' && recordFor('k3')?.id === 't2');
+ok('the focused comment marks its record as focused', focusRows[1].isFocusedChange === true && focusRows[0].isFocusedChange === false);
+
 console.log('\n' + pass + '/' + (pass + fail) + ' checks passed');
 process.exit(fail ? 1 : 0);
