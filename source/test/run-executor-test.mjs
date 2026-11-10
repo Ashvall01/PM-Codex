@@ -16,7 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   mkdirSync, rmSync, cpSync, writeFileSync, readFileSync, readdirSync,
-  existsSync, symlinkSync,
+  existsSync, symlinkSync, unlinkSync, rmdirSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -24,10 +24,17 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
+// TypeScript's compiler, started with node: `npx` is a .cmd file on Windows,
+// which cannot be started directly.
+const TSC = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 // Built in the system temp folder, not in the project: nothing to clean up,
 // nothing to add to an upload by accident.
 const out = join(tmpdir(), 'pm-codex-executor-test');
 
+// The scratch folder holds a link to the project's node_modules. Take the link
+// away by itself first (unlink on macOS/Linux, rmdir for a Windows junction),
+// so clearing the folder can never reach through it into the real packages.
+for (const remove of [unlinkSync, rmdirSync]) { try { remove(join(out, 'node_modules')); break; } catch { /* not there, or the other kind */ } }
 try { rmSync(out, { recursive: true, force: true }); } catch { /* fine */ }
 mkdirSync(out, { recursive: true });
 
@@ -35,16 +42,16 @@ mkdirSync(out, { recursive: true });
 // importing file, so the build folder needs the project's packages beside it.
 const linkedModules = join(out, 'node_modules');
 if (!existsSync(linkedModules)) {
-  try { symlinkSync(join(root, 'node_modules'), linkedModules, 'dir'); }
+  try { symlinkSync(join(root, 'node_modules'), linkedModules, 'junction'); }
   catch (err) { console.log('Could not link node_modules:', err.message); }
 }
 
 console.log('Compiling the executor and its stores…');
 try {
   execFileSync(
-    'npx',
+    'node',
     [
-      'tsc',
+      TSC,
       'src/services/acrExecutor.ts',
       'src/services/momActionPush.ts',
       '--outDir', out,

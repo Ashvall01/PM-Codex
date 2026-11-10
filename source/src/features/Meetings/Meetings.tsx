@@ -29,6 +29,7 @@ import { useMeetingsStore } from '../../store/meetingsStore';
 import { safeStateStorage } from '../../utils/safeStorage';
 import { useAcrStore, ACRChange } from '../../store/acrStore';
 import { useAiStore } from '../../store/aiStore';
+import { copyText } from '../../utils/copyText';
 
 // Gemini goes through the local key server — see services/geminiClient.ts.
 const ai = gemini;
@@ -2219,8 +2220,8 @@ Guidelines:
                      {/* Action Bar */}
                      <div className="flex flex-wrap items-center gap-2">
                         <button
-                           onClick={() => {
-                              navigator.clipboard.writeText(transcript);
+                           onClick={async () => {
+                              if (!(await copyText(transcript))) return; // no false "copied" tick
                               setCopiedTranscript(true);
                               setTimeout(() => setCopiedTranscript(false), 2000);
                            }}

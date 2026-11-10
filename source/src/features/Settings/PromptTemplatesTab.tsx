@@ -23,6 +23,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
+import { copyText } from '../../utils/copyText';
 
 const CATEGORIES: { id: TemplateCategory | 'All'; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'All', label: 'ALL CATEGORIES', icon: Layers },
@@ -144,8 +145,8 @@ export const PromptTemplatesTab: React.FC = () => {
     setEditingTemplateId(null);
   };
 
-  const handleCopyPrompt = (template: PromptTemplate) => {
-    navigator.clipboard.writeText(template.prompt);
+  const handleCopyPrompt = async (template: PromptTemplate) => {
+    if (!(await copyText(template.prompt))) return; // no false "copied" tick
     setCopiedId(template.id);
     setTimeout(() => setCopiedId(null), 2000);
   };

@@ -70,6 +70,8 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const inRect = (rc: Rect, r: number, c: number) => r >= rc.r1 && r <= rc.r2 && c >= rc.c1 && c <= rc.c2;
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD = isMac ? '⌘' : 'Ctrl+';
+// Redo as each system writes it: ⌘⇧Z on a Mac, Ctrl+Y on Windows. Both keys work on both.
+const REDO_KEYS = isMac ? '⌘⇧Z' : 'Ctrl+Y';
 
 /** A stable function that always calls the latest version (for event handlers). */
 function useEvent<T extends (...args: any[]) => any>(fn: T): T {
@@ -283,7 +285,7 @@ const ActivityRow = React.memo(function ActivityRow(p: RowProps) {
         {!isAcrRow && (
           <button
             onClick={() => p.onDelete(index)}
-            title="Delete row (undo with Cmd+Z)"
+            title={`Delete row (undo with ${MOD}Z)`}
             className="text-qb-light-grey hover:text-qb-orange opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center w-full h-full"
           >
             <Trash2 className="w-4 h-4" />
@@ -1631,7 +1633,7 @@ export default function ActivityTable({ projectId, revision }: { projectId: stri
         <button
           onClick={doRedo}
           disabled={!canRedoNow}
-          title={canRedoNow ? `Redo ${H.redoLabel(projectId, revision.id)} (${MOD}⇧Z)` : 'Nothing to redo'}
+          title={canRedoNow ? `Redo ${H.redoLabel(projectId, revision.id)} (${REDO_KEYS})` : 'Nothing to redo'}
           className="p-1.5 text-qb-dark-grey hover:text-qb-orange disabled:text-qb-light-grey disabled:hover:text-qb-light-grey"
         ><Redo2 className="w-4 h-4" /></button>
         <div className="w-px h-5 bg-qb-light-grey mx-1" />

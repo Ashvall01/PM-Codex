@@ -25,7 +25,7 @@ import { readFileSync, existsSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect } from 'node:net';
 import { spawn } from 'node:child_process';
-import { loadConfig, hubSocketPath, makeLogger, HUB_PROTOCOL, HERE } from './config.mjs';
+import { loadConfig, hubSocketPath, nodeCandidates, makeLogger, HUB_PROTOCOL, HERE } from './config.mjs';
 
 const config = loadConfig();
 const log = makeLogger('mcp');
@@ -110,41 +110,7 @@ function connectOnce() {
   });
 }
 
-/**
- * Which program to run the hub with.
- *
- * NEVER the host application's own binary. Inside Claude, process.execPath is
- * "Claude Helper (Plugin)". Launching that as a detached process makes macOS
- * see a second copy of a Claude helper starting by itself, and it asks the user
- * for their keychain password before it will run. The user then gets a password
- * prompt they did not ask for, from a bridge that has no business near their
- * keychain, and the hub sits blocked behind the dialog looking like a crash.
- *
- * So: a real node binary, always. The host's binary is used only in the case
- * where it genuinely is node.
- */
-function looksLikeNode(path) {
-  return /^node(\.exe)?$/i.test((path || '').split('/').pop() || '');
-}
-
-function isApplicationBinary(path) {
-  return /\.app\//.test(path || '');
-}
-
-function nodeCandidates() {
-  const seen = new Set();
-  const list = [];
-  const push = (c) => { if (c && !seen.has(c)) { seen.add(c); list.push(c); } };
-
-  const exe = process.execPath;
-  if (looksLikeNode(exe)) push(exe);            // it really is node — use it
-  push('/usr/local/bin/node');
-  push('/opt/homebrew/bin/node');
-  push('/usr/bin/node');
-  push('node');                                  // whatever PATH offers
-  if (!looksLikeNode(exe) && !isApplicationBinary(exe)) push(exe);  // last resort
-  return list;
-}
+// Which program to run the hub with: nodeCandidates() in config.mjs.
 
 let spawnAttempt = 0;
 
@@ -166,6 +132,9 @@ function spawnHub() {
     const child = spawn(exe, [HUB_PATH], {
       cwd: HERE,
       detached: true,
+      // Windows gives a detached console program a window of its own; this
+      // keeps the hub from flashing one on the user's screen.
+      windowsHide: true,
       stdio: ['ignore', out, out],
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PM_CODEX_BRIDGE_LOG_IS_STDERR: '1' },
     });

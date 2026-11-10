@@ -18,11 +18,15 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
+// TypeScript's compiler, started with node: `npx` is a .cmd file on Windows,
+// which cannot be started directly.
+const TSC = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 const out = join(tmpdir(), 'pm-codex-gantt-dates-test');
 try { rmSync(out, { recursive: true, force: true }); } catch { /* fine */ }
 mkdirSync(out, { recursive: true });
 
-execFileSync('npx', ['tsc', 'src/features/Timeline/ganttDates.ts', '--outDir', out,
+execFileSync('node', [
+  TSC, 'src/features/Timeline/ganttDates.ts', '--outDir', out,
   '--module', 'esnext', '--target', 'es2022', '--skipLibCheck'], { cwd: root, stdio: 'inherit' });
 writeFileSync(join(out, 'package.json'), '{"type":"module"}');
 cpSync(join(here, 'gantt-dates.test.mjs'), join(out, 'gantt-dates.test.mjs'));

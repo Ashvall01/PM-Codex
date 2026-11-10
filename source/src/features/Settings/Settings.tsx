@@ -35,6 +35,8 @@ import PIIGlossary from '../PIIGlossary/PIIGlossary';
 import { AIDebugPanel } from './AIDebugPanel';
 import { PromptTemplatesTab } from './PromptTemplatesTab';
 import { PageHeader } from '../../components/PageHeader';
+import { copyText } from '../../utils/copyText';
+import { checkWebAppUrl } from '../../utils/webAppUrl';
 
 const IMPACT_LEVELS: ImpactLevel[] = ['Positive (Opportunity)', 'Low', 'Moderate', 'High', 'Critical', 'Catastrophic'];
 const PROBABILITIES: ProbabilityLevel[] = ['Rare', 'Low', 'Moderate', 'High', 'Almost Certain', 'Uncertain'];
@@ -120,8 +122,9 @@ const SheetSection: React.FC = () => {
             : { label: 'All saved', tone: 'var(--color-qb-green)', text: 'Everything is in your Google Sheet.' };
 
   const connect = async () => {
-    const url = dbInput.trim();
-    if (!url) { setCheck({ tone: 'magenta', text: 'Paste the web app address first.' }); return; }
+    const checked = checkWebAppUrl(dbInput);
+    if (checked.ok === false) { setCheck({ tone: 'magenta', text: checked.message }); return; }
+    const url = checked.url;
     setCheck(null);
     try {
       const response = await fetch(`${url}?action=version&t=${Date.now()}`);
@@ -240,7 +243,10 @@ const SheetSection: React.FC = () => {
           </p>
           <button
             className={secondaryButton}
-            onClick={() => { navigator.clipboard.writeText(MOCK_GAS_SCRIPT); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            onClick={async () => {
+              if (await copyText(MOCK_GAS_SCRIPT)) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+              else setCheck({ tone: 'magenta', text: 'Your browser did not allow the copy. Click into this page and try again.' });
+            }}
           >
             {copied ? <><Check className="w-3.5 h-3.5 text-qb-green" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy the script (v{EXPECTED_GAS_VERSION})</>}
           </button>

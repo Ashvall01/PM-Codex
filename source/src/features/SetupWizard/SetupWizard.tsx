@@ -3,6 +3,8 @@ import { useAppStore } from '../../store/appStore';
 import { Check, Copy, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { MOCK_GAS_SCRIPT, EXPECTED_GAS_VERSION } from '../../services/gasSyncService';
 import { GeminiKeyForm } from '../../components/GeminiKeyForm';
+import { copyText } from '../../utils/copyText';
+import { checkWebAppUrl } from '../../utils/webAppUrl';
 
 const SetupWizard: React.FC = () => {
   const { setGasUrl } = useAppStore();
@@ -14,18 +16,38 @@ const SetupWizard: React.FC = () => {
   const [showBypass, setShowBypass] = useState(false);
   const [geminiReady, setGeminiReady] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(MOCK_GAS_SCRIPT);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const scriptRef = React.useRef<HTMLPreElement>(null);
+
+  const handleCopy = async () => {
+    if (await copyText(MOCK_GAS_SCRIPT)) {
+      setCopyFailed(false);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+    // The browser refused. Select the script so the keyboard copy works, and say so.
+    setCopyFailed(true);
+    const el = scriptRef.current;
+    if (el) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
   };
 
   const handleConnect = async (force = false) => {
-    const cleanUrl = inputUrl.trim();
-    if (!cleanUrl) {
-      setError('PLEASE ENTER A VALID URL.');
+    // Only an Apps Script web app address is ever accepted — also by FORCE
+    // CONNECT, which skips the live check, not this one (utils/webAppUrl.ts).
+    const checked = checkWebAppUrl(inputUrl);
+    if (checked.ok === false) {
+      setError(checked.message);
+      setShowBypass(false);
       return;
     }
+    const cleanUrl = checked.url;
 
     if (force) {
       setGasUrl(cleanUrl);
@@ -143,7 +165,7 @@ const SetupWizard: React.FC = () => {
                  Open your Google Sheet, click on <strong className="text-qb-orange">Extensions &gt; Apps Script</strong>. Replace the default code with the script below, then click <strong className="text-qb-orange">Deploy &gt; New deployment</strong> as a Web App. Make sure access is set to "Anyone".
                </p>
                <div className="relative">
-                 <pre className="bg-transparent border border-qb-light-grey text-qb-dark-grey p-4 text-xs font-mono overflow-x-auto overflow-y-auto max-h-64">
+                 <pre ref={scriptRef} className="bg-transparent border border-qb-light-grey text-qb-dark-grey p-4 text-xs font-mono overflow-x-auto overflow-y-auto max-h-64">
                    {MOCK_GAS_SCRIPT}
                  </pre>
                  <button 
@@ -154,6 +176,11 @@ const SetupWizard: React.FC = () => {
                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                  </button>
                </div>
+               {copyFailed && (
+                 <p className="text-qb-magenta font-bold text-xs leading-relaxed">
+                   Your browser did not allow the copy. The script is selected: press Ctrl+C (⌘C on a Mac), then paste it into Apps Script.
+                 </p>
+               )}
                <div className="pt-8 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-4">
                   <button onClick={() => setStep(1)} className="text-sm font-black uppercase tracking-widest text-qb-grey hover:text-qb-black transition-colors w-full sm:w-auto py-3 sm:py-0 cursor-pointer">
                     BACK

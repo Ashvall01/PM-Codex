@@ -35,6 +35,9 @@ const sheet = {
   failWrites: false,      // Apps Script answers {status:'error'}
   httpStatus: 200,        // e.g. 500
   htmlReply: false,       // a Google sign-in page
+  failReads: false,       // the Sheet cannot be reached for a read
+  loadError: false,       // the script answers a read with {status:'error'}
+  loads: 0,
   delayMs: 0,
   posts: 0,
   inFlight: 0,
@@ -90,7 +93,12 @@ globalThis.fetch = async (url, opts = {}) => {
     }
   }
   if (u.searchParams.get('action') === 'version') return reply(200, JSON.stringify({ version: '1.1.0-MVP' }));
-  if (u.searchParams.get('action') === 'load') return reply(200, JSON.stringify({ status: 'success', data: readSheets() }));
+  if (u.searchParams.get('action') === 'load') {
+    if (sheet.failReads) throw new TypeError('Failed to fetch');
+    if (sheet.loadError) return reply(200, JSON.stringify({ status: 'error', message: 'Exception: Service Spreadsheets timed out' }));
+    sheet.loads++;
+    return reply(200, JSON.stringify({ status: 'success', data: readSheets() }));
+  }
   return reply(200, JSON.stringify({ status: 'ok' }));
 };
 
@@ -118,6 +126,7 @@ const run = async (fn) => { const restore = quiet(); try { return await fn(); } 
 
 const resetAll = () => {
   sheet.db = {}; sheet.failWrites = false; sheet.httpStatus = 200; sheet.htmlReply = false; sheet.delayMs = 0; sheet.posts = 0; sheet.maxInFlight = 0;
+  sheet.failReads = false; sheet.loadError = false; sheet.loads = 0;
   useAppStore.setState({ gasUrl: URL_, projects: [{ id: P, name: 'P', description: '', createdAt: 1 }], deletedRecordIds: [], syncStatus: 'idle', syncErrorMessage: null });
   useTimelineStore.setState({ projectTimelines: [] });
   useTasksStore.setState({ tasks: [] });
@@ -126,7 +135,16 @@ const resetAll = () => {
   useSyncQueueStore.setState({ jobs: [] });
   useAppStore.setState({ syncHeldBack: null });
   gasSyncService.allowLargeDeletionOnce = false;
+  // The ordinary case: a browser that has read this Sheet before (an empty one).
+  localStorage.setItem('pm-codex-sheet-row-counts', JSON.stringify({}));
+  localStorage.setItem('pm-codex-sheet-row-counts-for', URL_);
+};
+/** A browser that has never read the Sheet: a new computer, another browser, cleared site data. */
+const freshBrowser = () => {
+  resetAll();
   localStorage.removeItem('pm-codex-sheet-row-counts');
+  localStorage.removeItem('pm-codex-sheet-row-counts-for');
+  useAppStore.setState({ projects: [] });
 };
 const task = (id, description) => ({ id, projectId: P, type: 'Action Item', createdDate: 1, description, status: 'Open', comments: [], linkedActivityIds: [] });
 
@@ -311,6 +329,107 @@ ok('ordinary deletions are not held back (30 → 22)', saved === true && sheet.d
 useTasksStore.setState({ tasks: many.slice(0, 13) });
 saved = await run(() => gasSyncService.syncNow());
 ok('nor a big share of a small sheet (22 → 13 is 9 rows)', saved === true && sheet.db.tasks.length === 13);
+
+// ------------------------------------- a browser that has never read the Sheet
+// The Sheet is small on purpose: every sheet is under the guard's 10-row floor,
+// so before this rule one edit in a new browser emptied all of it.
+const theirSheet = () => writeSheets({
+  projects: [{ id: P, name: 'P', description: '', createdAt: 1 }, { id: 'proj-2', name: 'Q', description: '', createdAt: 2 }],
+  tasks: Array.from({ length: 6 }, (_, i) => task(`t${i}`, `task ${i}`)),
+});
+freshBrowser();
+theirSheet();
+useAppStore.setState({ projects: [{ id: 'proj-new', name: 'Made before the Sheet was read', description: '', createdAt: 3 }] });
+useSyncQueueStore.getState().addJob('projects', 'proj-new', 'CREATE', {});
+await run(() => gasSyncService.processSyncQueue());
+ok('new browser: the first save reads the Sheet first', sheet.loads === 1, `loads=${sheet.loads}`);
+ok('…the Sheet keeps every record it had', sheet.db.tasks.length === 6 && sheet.db.projects.some(p => p.id === 'proj-2'),
+   `tasks ${sheet.db.tasks.length}, projects ${sheet.db.projects.map(p => p.id)}`);
+ok('…and gains the record made in this browser', sheet.db.projects.some(p => p.id === 'proj-new') && sheet.db.projects.length === 3);
+ok('…the browser now shows the Sheet\'s records too', useTasksStore.getState().tasks.length === 6 && useAppStore.getState().projects.length === 3);
+ok('…and the change is marked saved', useSyncQueueStore.getState().jobs.find(j => j.entityId === 'proj-new')?.status === 'COMPLETED');
+
+freshBrowser();
+theirSheet();
+sheet.failReads = true;
+useAppStore.setState({ projects: [{ id: 'proj-new', name: 'N', description: '', createdAt: 3 }] });
+saved = await run(() => gasSyncService.syncNow());
+ok('new browser, Sheet unreachable: nothing is written', saved === false && sheet.posts === 0 && sheet.db.tasks.length === 6,
+   `saved=${saved}, posts=${sheet.posts}`);
+ok('…and the header says why, in plain words', useAppStore.getState().syncStatus === 'error'
+   && /could not read your Google Sheet/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
+await run(() => gasSyncService.retryNow());
+ok('…RETRY while it is still unreachable writes nothing either', sheet.posts === 0 && sheet.db.tasks.length === 6);
+sheet.failReads = false;
+await run(() => gasSyncService.retryNow());
+ok('…once it can be read, RETRY merges and saves', sheet.db.tasks.length === 6 && sheet.db.projects.length === 3
+   && useAppStore.getState().syncStatus === 'synced', `tasks ${sheet.db.tasks.length}, projects ${sheet.db.projects.length}`);
+
+// An edit made here to a record the Sheet also holds, in a browser whose row
+// counts are gone: the edit cannot be written first, so it must win the merge.
+freshBrowser();
+theirSheet();
+useAppStore.setState({ projects: [{ id: P, name: 'P', description: '', createdAt: 1 }] });
+useTasksStore.setState({ tasks: [task('t0', 'edited here, not yet saved')] });
+useSyncQueueStore.getState().addJob('tasks', 't0', 'UPDATE', {});
+await run(() => gasSyncService.loadAll(URL_));
+ok('never-read browser with unsaved work: its own edit survives the merge',
+   useTasksStore.getState().tasks.find(t => t.id === 't0')?.description === 'edited here, not yet saved'
+   && useTasksStore.getState().tasks.length === 6, JSON.stringify(useTasksStore.getState().tasks.map(t => t.description)));
+ok('…and nothing was written before the read', sheet.posts === 0);
+await run(() => gasSyncService.processSyncQueue());
+ok('…then the edit reaches the Sheet, with the other five rows intact',
+   sheet.db.tasks.length === 6 && sheet.db.tasks.find(t => t.id === 't0')?.description === 'edited here, not yet saved');
+
+// Row counts remembered for one Sheet say nothing about another.
+resetAll();
+writeSheets({ tasks: [task('a1', 'in the first Sheet')], projects: [{ id: P, name: 'P', description: '', createdAt: 1 }] });
+await run(() => gasSyncService.loadAll(URL_));
+const OTHER = 'http://fake-sheet.test/other/exec';
+useAppStore.setState({ gasUrl: OTHER });
+sheet.db = {};
+writeSheets({ tasks: Array.from({ length: 4 }, (_, i) => task(`b${i}`, `other ${i}`)), projects: [{ id: 'proj-b', name: 'B', description: '', createdAt: 1 }] });
+sheet.loads = 0; sheet.posts = 0;
+saved = await run(() => gasSyncService.syncNow());
+ok('after connecting a different Sheet, the first save reads it first', sheet.loads === 1 && saved === true, `loads=${sheet.loads}`);
+ok('…so that Sheet\'s own records are still there', ['b0', 'b1', 'b2', 'b3'].every(id => sheet.db.tasks.some(t => t.id === id)) && sheet.db.projects.some(p => p.id === 'proj-b'),
+   JSON.stringify(sheet.db.tasks.map(t => t.id)));
+
+// A read the script answers with an error is an error, not "all saved".
+resetAll();
+theirSheet();
+sheet.loadError = true;
+let threw = false;
+await run(() => gasSyncService.loadAll(URL_).catch(() => { threw = true; }));
+ok('a read the script refuses is reported, not shown as saved', threw && useAppStore.getState().syncStatus === 'error'
+   && /could not be read/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
+sheet.loadError = false;
+
+// Two reads asked for at once are one read.
+resetAll();
+theirSheet();
+await run(() => Promise.all([gasSyncService.loadAll(URL_), gasSyncService.loadAll(URL_)]));
+ok('two loads asked for at once make one request', sheet.loads === 1, `loads=${sheet.loads}`);
+
+// ------------------------------------------------------------ the cell limit
+resetAll();
+writeSheets({ tasks: [task('t1', 'in the Sheet')], projects: [{ id: P, name: 'P', description: '', createdAt: 1 }] });
+await run(() => gasSyncService.loadAll(URL_));
+useCodexStore.setState({ pages: [{ id: 'c1', projectId: P, title: 'Weekly status report', content: 'x'.repeat(50001), updatedAt: '2026-11-10T00:00:00.000Z' }] });
+sheet.posts = 0;
+saved = await run(() => gasSyncService.syncNow());
+ok('a field longer than one Sheet cell: nothing is written', saved === false && sheet.posts === 0 && sheet.db.tasks.length === 1, `posts=${sheet.posts}`);
+ok('…and the header names the record, the field and the sizes', /"Weekly status report" in Codex pages/.test(useAppStore.getState().syncErrorMessage || '')
+   && /content holds 50,001 characters/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
+useCodexStore.setState({ pages: [{ id: 'c1', projectId: P, title: 'Weekly status report', content: 'x'.repeat(50000), updatedAt: '2026-11-10T00:00:00.000Z' }] });
+saved = await run(() => gasSyncService.syncNow());
+ok('exactly 50,000 characters fits', saved === true && sheet.db.codexPages?.[0]?.content.length === 50000);
+useCodexStore.setState({ pages: [] });
+useTasksStore.setState({ tasks: [{ ...task('t1', 'a task with very long comments'), comments: Array.from({ length: 60 }, (_, i) => ({ id: `c${i}`, text: 'y'.repeat(1000) })) }] });
+sheet.posts = 0;
+saved = await run(() => gasSyncService.syncNow());
+ok('a list is measured as the Sheet stores it (as JSON)', saved === false && sheet.posts === 0
+   && /"a task with very long comments" in tasks & issues/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
 
 // ------------------------------------------------------------- bulk import
 resetAll();

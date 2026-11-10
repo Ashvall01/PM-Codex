@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(HERE, '..', 'server.mjs');
@@ -82,14 +82,16 @@ const fakePort = await listen(fake);
 function startServer(port, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [SERVER], {
-      env: { PATH: process.env.PATH, PM_CODEX_PORT: String(port), PM_CODEX_GEMINI_UPSTREAM: `http://127.0.0.1:${fakePort}`, PM_CODEX_SECRETS_DIR: tmpSecrets(), ...env },
+      // SystemRoot: without it a Windows program cannot open a network socket.
+      env: { PATH: process.env.PATH, ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}), PM_CODEX_PORT: String(port), PM_CODEX_GEMINI_UPSTREAM: `http://127.0.0.1:${fakePort}`, PM_CODEX_SECRETS_DIR: tmpSecrets(), ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
     const onData = (d) => { out += d; if (/running at http:\/\/localhost:\d+/.test(out)) resolve({ child, out: () => out }); };
     child.stdout.on('data', onData); child.stderr.on('data', (d) => { out += d; });
     child.on('exit', (c) => reject(new Error(`server exited ${c}: ${out}`)));
-    setTimeout(() => reject(new Error(`server did not start: ${out}`)), 5000);
+    // Generous: a Windows machine scans every file of a program the first time it runs.
+    setTimeout(() => reject(new Error(`server did not start: ${out}`)), 30000);
   });
 }
 const freePort = async () => { const s = http.createServer(); const p = await listen(s); s.close(); return p; };
@@ -108,7 +110,7 @@ const rawRequest = (opts, body) => new Promise((resolve, reject) => {
 });
 
 try {
-  const { GoogleGenAI } = await import(SDK);
+  const { GoogleGenAI } = await import(pathToFileURL(SDK).href);
   const ai = new GoogleGenAI({ apiKey: 'pm-codex-local', httpOptions: { baseUrl: `${BASE}/api/gemini` } });
 
   console.log('SDK through the proxy');
@@ -210,8 +212,15 @@ try {
   check('a good key is saved', ok.status === 200 && ok.json?.configured === true && ok.json?.source === 'app');
   check('the answer gives only the last four characters', ok.json?.last4 === GOOD_KEY.slice(-4) && !ok.body.includes(GOOD_KEY));
   check('the key file holds the key, trimmed', existsSync(FILE3) && readFileSync(FILE3, 'utf8').trim() === GOOD_KEY);
-  check('the key file is owner-only (600)', existsSync(FILE3) && (statSync(FILE3).mode & 0o777) === 0o600, existsSync(FILE3) ? (statSync(FILE3).mode & 0o777).toString(8) : '');
-  check('the secrets folder is owner-only (700)', (statSync(DIR3).mode & 0o777) === 0o700, (statSync(DIR3).mode & 0o777).toString(8));
+  if (process.platform === 'win32') {
+    // Windows has no owner/group/other modes: a file is private because the
+    // user's own profile folder is. Nothing to measure here.
+    check('the key file is there (Windows keeps it private through the profile folder)', existsSync(FILE3));
+    check('the secrets folder is there', existsSync(DIR3));
+  } else {
+    check('the key file is owner-only (600)', existsSync(FILE3) && (statSync(FILE3).mode & 0o777) === 0o600, existsSync(FILE3) ? (statSync(FILE3).mode & 0o777).toString(8) : '');
+    check('the secrets folder is owner-only (700)', (statSync(DIR3).mode & 0o777) === 0o700, (statSync(DIR3).mode & 0o777).toString(8));
+  }
   const nBefore = seen.length;
   const call = await new Promise((resolve) => http.request({ host: '127.0.0.1', port: P3, method: 'POST', path: '/api/gemini/v1beta/models/x:generateContent', headers: { host: `localhost:${P3}`, 'content-type': 'application/json' } }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); }).end('{"contents":[]}'));
   const used = seen.slice(nBefore).find((x) => x.path.endsWith(':generateContent'));

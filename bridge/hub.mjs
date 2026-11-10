@@ -32,11 +32,14 @@
 import { WebSocketServer } from 'ws';
 import { createServer } from 'node:net';
 import { existsSync, unlinkSync, chmodSync } from 'node:fs';
-import { loadConfig, hubSocketPath, makeLogger, HUB_PROTOCOL, APP_PORT } from './config.mjs';
+import { loadConfig, hubSocketPath, isNamedPipe, makeLogger, HUB_PROTOCOL, APP_PORT } from './config.mjs';
 
 const config = loadConfig();
 const log = makeLogger('hub');
 const SOCK = hubSocketPath(config);
+// On Windows the address is a named pipe, not a file: nothing to clear before
+// listening, nothing to chmod, nothing to remove on the way out.
+const SOCK_IS_A_FILE = !isNamedPipe(SOCK);
 const STARTED_AT = new Date().toISOString();
 
 /* ----------------------------------------------------------- the app side */
@@ -271,7 +274,7 @@ async function handleLine(line, send) {
 wss.on('listening', () => {
   log.warn(`hub listening for the app on ws://127.0.0.1:${config.port} — propose-and-review phase`);
 
-  if (existsSync(SOCK)) {
+  if (SOCK_IS_A_FILE && existsSync(SOCK)) {
     try { unlinkSync(SOCK); } catch (e) { log.warn(`could not clear the old socket file: ${e.message}`); }
   }
 
@@ -283,7 +286,7 @@ wss.on('listening', () => {
   });
 
   clientServer.listen(SOCK, () => {
-    try { chmodSync(SOCK, 0o600); } catch {}
+    if (SOCK_IS_A_FILE) { try { chmodSync(SOCK, 0o600); } catch {} }
     log.warn(`hub ready for MCP servers on ${SOCK}`);
   });
 });
@@ -300,7 +303,7 @@ wss.on('error', (e) => {
 
 const shutdown = () => {
   try { wss.close(); } catch {}
-  try { if (existsSync(SOCK)) unlinkSync(SOCK); } catch {}
+  try { if (SOCK_IS_A_FILE && existsSync(SOCK)) unlinkSync(SOCK); } catch {}
   process.exit(0);
 };
 process.on('SIGINT', shutdown);

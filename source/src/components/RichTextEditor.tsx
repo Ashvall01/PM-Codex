@@ -7,6 +7,10 @@ import {
   Undo, Redo, Eraser, Type, Code, Terminal, Minus,
   Palette, Highlighter
 } from 'lucide-react';
+import { sanitizeRichHtml } from '../utils/safeHtml';
+
+/** Text as HTML shows it: `a < b` must stay `a < b`, not become a tag. */
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 interface RichTextEditorProps {
   id: string;
@@ -52,10 +56,15 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   ];
 
   // Sync prop value to DOM innerHTML only when it differs to prevent cursor jumping
+  // What the user types comes back here as `value` and already matches the DOM:
+  // nothing to do. Anything else arrived from outside the editor (a load, an
+  // assistant's proposal, another record) and is sanitized before it is put on
+  // the page (utils/safeHtml.ts).
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || '';
-    }
+    const el = editorRef.current;
+    if (!el || el.innerHTML === (value || '')) return;
+    const clean = sanitizeRichHtml(value);
+    if (el.innerHTML !== clean) el.innerHTML = clean;
   }, [value]);
 
   const onChangeRef = useRef(onChange);
@@ -114,7 +123,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       range.deleteContents();
 
       const el = document.createElement('div');
-      el.innerHTML = html;
+      el.innerHTML = sanitizeRichHtml(html);
       const frag = document.createDocumentFragment();
       let node;
       let lastNode;
@@ -165,14 +174,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleInsertCode = () => {
     const selection = window.getSelection();
     const text = selection ? selection.toString() : '';
-    const codeHtml = `<code class="bg-qb-box-bg px-1.5 py-0.5 rounded font-mono text-xs border border-qb-light-grey text-qb-magenta">${text || 'code_snippet'}</code>`;
+    const codeHtml = `<code class="bg-qb-box-bg px-1.5 py-0.5 rounded font-mono text-xs border border-qb-light-grey text-qb-magenta">${text ? escapeHtml(text) : 'code_snippet'}</code>`;
     insertHtmlAtCursor(codeHtml);
   };
 
   const handleInsertCodeBlock = () => {
     const selection = window.getSelection();
     const text = selection ? selection.toString() : '';
-    const blockHtml = `<pre class="bg-qb-black border border-qb-light-grey p-4 my-4 font-mono text-xs text-white max-w-none overflow-x-auto rounded-none whitespace-pre-wrap"><code>${text || '// Enter code here...'}</code></pre><p><br></p>`;
+    const blockHtml = `<pre class="bg-qb-black border border-qb-light-grey p-4 my-4 font-mono text-xs text-white max-w-none overflow-x-auto rounded-none whitespace-pre-wrap"><code>${text ? escapeHtml(text) : '// Enter code here...'}</code></pre><p><br></p>`;
     insertHtmlAtCursor(blockHtml);
   };
 

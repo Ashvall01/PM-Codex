@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { DateVisualizer, isLikelyDateString, parseDateSafely } from './DateVisualizer';
 import { transformDateTagsToMarkdown } from './layout/AIResponseRenderer';
+import { sanitizeRichHtml } from '../utils/safeHtml';
+import { MarkdownImage } from './MarkdownImage';
 
 interface RichTextViewerProps {
   content: string;
@@ -65,7 +67,9 @@ export const RichTextViewer: React.FC<RichTextViewerProps> = ({
   placeholder = '' 
 }) => {
   const hasHTML = isHTML(content || '');
-  const html = React.useMemo(() => (hasHTML ? normalizeForeignStyles(content) : ''), [content, hasHTML]);
+  // Sanitized first — this text may come from an assistant or the Sheet, not
+  // only from the user's own typing (utils/safeHtml.ts) — then tidied.
+  const html = React.useMemo(() => (hasHTML ? normalizeForeignStyles(sanitizeRichHtml(content)) : ''), [content, hasHTML]);
 
   if (!content || content.trim() === '') {
     if (placeholder) {
@@ -94,6 +98,7 @@ export const RichTextViewer: React.FC<RichTextViewerProps> = ({
       <ReactMarkdown 
         remarkPlugins={[remarkGfm]}
         components={{
+          img: ({node, ...props}: any) => <MarkdownImage src={props.src} alt={props.alt} />,
           a: ({node, href, children, ...props}: any) => {
             const textContent = typeof children === 'string'
               ? children

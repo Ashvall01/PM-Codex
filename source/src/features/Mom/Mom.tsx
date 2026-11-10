@@ -15,6 +15,8 @@ import { RichTextEditor } from '../../components/RichTextEditor';
 import { RichTextViewer } from '../../components/RichTextViewer';
 import { format } from 'date-fns';
 import { TaskTray } from '../Tasks/components/TaskTray';
+import { richTextToPlain } from '../../utils/safeHtml';
+import { copyText } from '../../utils/copyText';
 
 const MOM_ACTION_STATUS_OPTIONS: MoMActionItemStatus[] = ['Open', 'In Progress', 'On Hold', 'Blocked', 'Done', 'Dropped'];
 
@@ -584,11 +586,9 @@ export default function Mom() {
   };
 
   const generateExportText = (mom: MoM) => {
-    const stripHtml = (html: string) => {
-      const tmp = document.createElement("DIV");
-      tmp.innerHTML = html || '';
-      return tmp.textContent || tmp.innerText || "";
-    };
+    // Not a detached <div>: its innerHTML would still fetch images and run
+    // their error handlers. See utils/safeHtml.ts.
+    const stripHtml = (html: string) => richTextToPlain(html);
 
     return `MINUTES OF MEETING
 --------------------------------------------------
@@ -1271,7 +1271,7 @@ ${mom.actionItems.map(a => `- [${a.status}] ${a.description} (Assignee: ${a.assi
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     const sample = {
                       title: "Sprint Planning & Architecture Review",
                       date: new Date().toISOString().split('T')[0],
@@ -1289,7 +1289,7 @@ ${mom.actionItems.map(a => `- [${a.status}] ${a.description} (Assignee: ${a.assi
                         }
                       ]
                     };
-                    navigator.clipboard.writeText(JSON.stringify(sample, null, 2));
+                    if (!(await copyText(JSON.stringify(sample, null, 2)))) return; // no false "copied" tick
                     setTemplateCopied(true);
                     setTimeout(() => setTemplateCopied(false), 2000);
                   }}

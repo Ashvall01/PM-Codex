@@ -8,25 +8,16 @@
 // The public repo needs no sign-in. A copy cloned from a private repo may: if
 // the download fails, the step says so and carries on — pull in GitHub
 // Desktop instead, and run Update again to rebuild.
+//
+// The git logic is in launcher/update.mjs (Node), not in a shell line here:
+// every line below must read the same in macOS's shell and Windows' cmd.exe.
 module.exports = {
   version: "3.7",
   run: [
-    {
-      method: "shell.run",
-      params: {
-        message: "(git symbolic-ref -q HEAD >/dev/null || git checkout --quiet main) && git pull --ff-only || echo 'PM Codex: could not download updates here. If this copy came from GitHub Desktop, click Fetch origin / Pull there, then run Update again.'",
-        path: ".",
-        env: { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" }
-      }
-    },
+    { method: "shell.run", params: { message: "node launcher/update.mjs", path: "." } },
     { method: "shell.run", params: { message: "npm install --no-audit --no-fund", path: "source" } },
     { method: "shell.run", params: { message: "npm run build", path: "source", env: { GEMINI_API_KEY: "" } } },
-    {
-      method: "shell.run",
-      params: {
-        message: "npm install --no-audit --no-fund && echo 'PM Codex: updated. Start the app again. If Claude is connected, quit and reopen the Claude desktop app so it uses the new bridge.'",
-        path: "bridge"
-      }
-    }
+    { method: "shell.run", params: { message: "npm install --no-audit --no-fund", path: "bridge" } },
+    { method: "shell.run", params: { message: "node launcher/update.mjs done", path: "." } }
   ]
 }

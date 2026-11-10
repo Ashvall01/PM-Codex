@@ -4,14 +4,16 @@
 // The extension is a zip holding one manifest.json. The manifest points
 // Claude at this copy's bridge/server.mjs by its absolute path, and passes the
 // app's port (PM_CODEX_PORT, default 7800) so the bridge accepts the app's
-// address. Each computer makes its own; nothing here is specific to one person.
+// address, and the Node that ran this script (PM_CODEX_NODE) so the bridge can
+// start its hub with it. Each computer makes its own; nothing here is specific
+// to one person.
 //
 //   node bridge/tools/build-mcpb.mjs [output path]
 //
 // Default output: pm-codex-bridge.mcpb in the repo root (git ignores it).
 // No dependencies: the zip is written by hand (stored, not compressed).
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,9 +23,16 @@ const ROOT = path.resolve(BRIDGE, '..');
 const SERVER = path.join(BRIDGE, 'server.mjs');
 const OUT = path.resolve(process.argv[2] || path.join(ROOT, 'pm-codex-bridge.mcpb'));
 const PORT = String(Number(process.env.PM_CODEX_PORT) || 7800);
+// The Node running this script — Pinokio's own, when "Connect to Claude" is
+// clicked. The bridge starts its hub with it (nodeCandidates in config.mjs), so
+// a computer with no other Node installed still gets a hub. Left empty when
+// this is not plainly a node binary; the bridge then looks elsewhere.
+const NODE = /^node(\.exe)?$/i.test(path.basename(process.execPath)) ? process.execPath : '';
 
 if (!existsSync(path.join(BRIDGE, 'node_modules'))) {
   console.error('PM Codex: the bridge is not installed yet. In Pinokio, run Install (or Update) first.');
+  // An extension left from an earlier run would be opened as if it were new.
+  try { rmSync(OUT, { force: true }); } catch { /* nothing to remove */ }
   process.exit(1);
 }
 
@@ -31,7 +40,7 @@ const version = JSON.parse(readFileSync(path.join(BRIDGE, 'package.json'), 'utf8
 const template = readFileSync(path.join(BRIDGE, 'manifest.template.json'), 'utf8');
 const fill = (value) => {
   if (typeof value === 'string') {
-    return value.replaceAll('{{SERVER_PATH}}', SERVER).replaceAll('{{VERSION}}', version).replaceAll('{{APP_PORT}}', PORT);
+    return value.replaceAll('{{SERVER_PATH}}', SERVER).replaceAll('{{VERSION}}', version).replaceAll('{{APP_PORT}}', PORT).replaceAll('{{NODE_PATH}}', NODE);
   }
   if (Array.isArray(value)) return value.map(fill);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fill(v)]));
@@ -85,3 +94,4 @@ writeFileSync(OUT, zipOneFile('manifest.json', json));
 console.log(`PM Codex: made the Claude extension for this computer: ${OUT}`);
 console.log(`  bridge: ${SERVER}`);
 console.log(`  app address it accepts: http://localhost:${PORT}`);
+console.log(`  starts its hub with: ${NODE || 'node (found when needed)'}`);

@@ -15,10 +15,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
+// TypeScript's compiler, started with node: `npx` is a .cmd file on Windows,
+// which cannot be started directly.
+const TSC = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 const out = join(tmpdir(), 'pm-codex-pii-masking-test');
 mkdirSync(out, { recursive: true });
-execFileSync('npx', [
-  'tsc', 'src/utils/piiMasking.ts', '--outDir', out,
+execFileSync('node', [
+  TSC, 'src/utils/piiMasking.ts', '--outDir', out,
   '--module', 'esnext', '--target', 'es2022', '--skipLibCheck',
 ], { cwd: root, stdio: 'inherit' });
 writeFileSync(join(out, 'package.json'), '{"type":"module"}');

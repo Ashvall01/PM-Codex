@@ -10,7 +10,7 @@
  *   cd source && node test/run-sync-test.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, cpSync, writeFileSync, readFileSync, readdirSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdirSync, rmSync, cpSync, writeFileSync, readFileSync, readdirSync, existsSync, symlinkSync, unlinkSync, rmdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -19,11 +19,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const out = join(tmpdir(), 'pm-codex-sync-test');
 
+// The scratch folder holds a link to the project's node_modules. Take the link
+// away by itself first (unlink on macOS/Linux, rmdir for a Windows junction),
+// so clearing the folder can never reach through it into the real packages.
+for (const remove of [unlinkSync, rmdirSync]) { try { remove(join(out, 'node_modules')); break; } catch { /* not there, or the other kind */ } }
 try { rmSync(out, { recursive: true, force: true }); } catch { /* fine */ }
 mkdirSync(out, { recursive: true });
 const linkedModules = join(out, 'node_modules');
 if (!existsSync(linkedModules)) {
-  try { symlinkSync(join(root, 'node_modules'), linkedModules, 'dir'); }
+  try { symlinkSync(join(root, 'node_modules'), linkedModules, 'junction'); }
   catch (err) { console.log('Could not link node_modules:', err.message); }
 }
 

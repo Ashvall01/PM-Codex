@@ -14,6 +14,16 @@ import { useAcrStore } from '../store/acrStore';
 import { runStorageMaintenance } from '../utils/safeStorage';
 
 let consecutivePollingErrors = 0;
+/** The read of the Sheet under way, if any. See loadAll. */
+let loadInFlight: Promise<void> | null = null;
+/**
+ * Set for one read: this browser has never read the Sheet AND holds changes
+ * not yet saved. Its unsaved work cannot be written first (see "READ BEFORE THE
+ * FIRST WRITE"), so where a record is on both sides the browser's copy is
+ * kept. Records only the Sheet has, and records only the browser has, are both
+ * kept as always — nothing is dropped from either side.
+ */
+let keepLocalOnConflict = false;
 
 // Helper to recursively scrub non-printable ASCII/Unicode control characters
 // or invisible spacing characters that crash JSON parsers or cells.
@@ -115,11 +125,32 @@ export const LARGE_DELETION = { minRows: 10, share: 0.5 };
 
 const countRows = (data: Record<string, any>): Record<string, number> =>
   Object.fromEntries(Object.keys(GUARDED_SHEETS).map(k => [k, Array.isArray(data?.[k]) ? data[k].length : 0]));
+/** Which Sheet (web app address) the remembered row counts belong to. */
+const ROW_COUNTS_URL_KEY = 'pm-codex-sheet-row-counts-for';
+/**
+ * The row counts of the Sheet this browser is connected to — or null when this
+ * browser has never read that Sheet (and never had a save confirmed by it).
+ * Counts remembered for another address say nothing about this one, so they
+ * read as null too. Null is what makes the first save read first: see
+ * "READ BEFORE THE FIRST WRITE" in pushOnce.
+ */
 const readKnownCounts = (): Record<string, number> | null => {
-  try { const raw = localStorage.getItem(ROW_COUNTS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try {
+    const raw = localStorage.getItem(ROW_COUNTS_KEY);
+    if (!raw) return null;
+    const url = useAppStore.getState().gasUrl || '';
+    const forUrl = localStorage.getItem(ROW_COUNTS_URL_KEY);
+    // Counts saved before the address was recorded belong to the Sheet in use.
+    if (forUrl === null) localStorage.setItem(ROW_COUNTS_URL_KEY, url);
+    else if (forUrl !== url) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
 };
 const writeKnownCounts = (counts: Record<string, number>) => {
-  try { localStorage.setItem(ROW_COUNTS_KEY, JSON.stringify(counts)); } catch { /* the guard just starts fresh */ }
+  try {
+    localStorage.setItem(ROW_COUNTS_KEY, JSON.stringify(counts));
+    localStorage.setItem(ROW_COUNTS_URL_KEY, useAppStore.getState().gasUrl || '');
+  } catch { /* the guard just starts fresh */ }
 };
 /**
  * Rows the user has asked to remove — a deleted project — are taken off the
@@ -150,6 +181,41 @@ export function describeLargeDeletions(known: Record<string, number> | null, nex
     .filter(k => known[k] - (next[k] || 0) >= LARGE_DELETION.minRows && (next[k] || 0) < known[k] * LARGE_DELETION.share)
     .map(k => `${GUARDED_SHEETS[k]} ${known[k]} → ${next[k] || 0}`);
   return hits.length ? hits.join(', ') : null;
+}
+
+/**
+ * THE CELL LIMIT.
+ *
+ * One Google Sheets cell holds at most 50,000 characters. The script clears a
+ * sheet and then writes it; a longer value makes that write fail — leaving
+ * that sheet EMPTY and every sheet after it unwritten, with only the script's
+ * own error ("Your input contains more than the maximum of 50000 characters in
+ * a single cell") to go on, which does not say where. So the save is checked
+ * here first: if any field is too long, nothing is written and the header
+ * names the record. Lists and objects are measured as the script stores them
+ * (as JSON text).
+ */
+export const SHEET_CELL_LIMIT = 50000;
+const SHEET_LABEL: Record<string, string> = {
+  ...GUARDED_SHEETS, acrs: 'change requests', aiSessions: 'chats', aiMessages: 'chat messages',
+};
+export function findOversizedCell(payload: Record<string, any>): string | null {
+  for (const [sheetName, records] of Object.entries(payload || {})) {
+    if (!Array.isArray(records)) continue;
+    for (const record of records) {
+      if (!record || typeof record !== 'object') continue;
+      for (const [field, value] of Object.entries(record)) {
+        const length = typeof value === 'string' ? value.length
+          : value && typeof value === 'object' ? JSON.stringify(value).length : 0;
+        if (length <= SHEET_CELL_LIMIT) continue;
+        const name = [record.title, record.name, record.description, record.activity, record.id]
+          .find((v) => typeof v === 'string' && v.trim());
+        const label = SHEET_LABEL[sheetName] || sheetName;
+        return `"${String(name || 'a record').trim().slice(0, 60)}" in ${label} is too long for the Google Sheet: its ${field} holds ${length.toLocaleString('en-US')} characters, and one cell takes ${SHEET_CELL_LIMIT.toLocaleString('en-US')}. Shorten it or split it in two. Nothing was written; your work is kept in this browser.`;
+      }
+    }
+  }
+  return null;
 }
 
 function isLocalNewer(localUpdatedAt: string, serverUpdatedAt: string): boolean {
@@ -201,7 +267,7 @@ function mergeWithTimestamps<T extends { id: string; updatedAt: string }>(
       mergedMap.set(serverItem.id, serverItem);
     } else {
       // Exists in both, compare updatedAt
-      if (isLocalNewer(localItem.updatedAt, serverItem.updatedAt)) {
+      if (keepLocalOnConflict || isLocalNewer(localItem.updatedAt, serverItem.updatedAt)) {
         // Local is newer, keep local and mark for sync back
         mergedMap.set(serverItem.id, localItem);
         requiresSync = true;
@@ -247,9 +313,12 @@ function mergeById<T extends { id: string }>(
 
   const mergedMap = new Map<string, T>();
 
-  // For server items, keep them
+  // For server items, keep them — unless this browser holds unsaved work and
+  // has never read the Sheet (keepLocalOnConflict), where its own copy stands.
   for (const serverItem of Array.from(serverMap.values())) {
-    mergedMap.set(serverItem.id, serverItem);
+    const localItem = keepLocalOnConflict ? localMap.get(serverItem.id) : undefined;
+    if (localItem) { mergedMap.set(serverItem.id, localItem); requiresSync = true; }
+    else mergedMap.set(serverItem.id, serverItem);
   }
 
   // For local items that don't exist on server, keep them and mark for sync back
@@ -619,6 +688,24 @@ export const gasSyncService = {
     const store = useAppStore.getState();
     store.setSyncStatus('syncing');
 
+    // READ BEFORE THE FIRST WRITE.
+    //
+    // A save replaces every sheet with what this browser holds. A browser that
+    // has never read the Sheet — a new computer, another browser, cleared site
+    // data, a start-up load that timed out — holds little or nothing, and the
+    // large-deletion guard below has no row counts to compare against. One
+    // edit there used to empty the whole Sheet. So the first save reads the
+    // Sheet first and merges it in (records only this browser has are kept);
+    // if the Sheet cannot be read, nothing is written.
+    if (readKnownCounts() === null) {
+      try { await gasSyncService.loadAll(gasUrl); } catch { /* reported just below */ }
+      if (readKnownCounts() === null) {
+        store.setSyncStatus('error', 'Not saved yet: PM Codex could not read your Google Sheet, and it never writes to a Sheet it has not read (a save replaces what is there). Your work is kept in this browser. Check your connection and the web app address (Settings), then RETRY.');
+        return false;
+      }
+      store.setSyncStatus('syncing');
+    }
+
     try {
       const rawPayload: Record<string, any> = {};
       for (const [key, getStoreData] of Object.entries(STORES)) {
@@ -634,6 +721,11 @@ export const gasSyncService = {
       gasSyncService.allowLargeDeletionOnce = false;
       store.setSyncHeldBack(null);
       const payload = sanitizePayload(rawPayload);
+      const tooLong = findOversizedCell(payload);
+      if (tooLong) {
+        store.setSyncStatus('error', tooLong);
+        return false;
+      }
 
       const response = await fetch(gasUrl, {
         method: 'POST',
@@ -657,15 +749,31 @@ export const gasSyncService = {
     }
   },
 
-  loadAll: async (gasUrl: string, isBackground?: boolean) => {
+  /**
+   * Read the Sheet and merge it into this browser. One read at a time: a
+   * second call while one is under way gets the same read.
+   */
+  loadAll: (gasUrl: string, isBackground?: boolean): Promise<void> => {
+    if (loadInFlight) return loadInFlight;
+    loadInFlight = gasSyncService.loadOnce(gasUrl, isBackground).finally(() => { loadInFlight = null; });
+    return loadInFlight;
+  },
+
+  loadOnce: async (gasUrl: string, isBackground?: boolean): Promise<void> => {
+    const { useSyncQueueStore } = await import('../store/syncQueueStore');
     gasSyncService.isPerformingLoad = true;
     gasSyncService.hasLocalChangeDuringLoad = false;
     const store = useAppStore.getState();
     const prevStatus = store.syncStatus;
+    // This browser has never read this Sheet. Then nothing may be written
+    // before the read (so no pre-flight save), and what is read is always
+    // merged in, never set aside: the merge keeps records only this browser
+    // has, and without it the next save would replace the Sheet with them.
+    const neverRead = readKnownCounts() === null;
+    keepLocalOnConflict = neverRead && useSyncQueueStore.getState().jobs.some((j) => j.status !== 'COMPLETED');
     
     // Phase 4 plan: Pre-Flight check
     // If there are pending jobs on cold start, push them FIRST.
-    const { useSyncQueueStore } = await import('../store/syncQueueStore');
     // Failed work, and a save cut off when the tab closed, are unsaved work
     // too: give them another go before pulling. (Nothing else is saving yet —
     // loadAll runs once, at start-up.)
@@ -673,7 +781,7 @@ export const gasSyncService = {
     useSyncQueueStore.setState((s) => ({
       jobs: s.jobs.map((j) => (j.status === 'SYNCING' ? { ...j, status: 'PENDING' as const } : j)),
     }));
-    if (useSyncQueueStore.getState().getPendingJobs().length > 0) {
+    if (!neverRead && useSyncQueueStore.getState().getPendingJobs().length > 0) {
       if (!isBackground) store.setSyncStatus('syncing');
       console.log('Pre-Flight Check: Offline mutations found. Pushing queue to DB before pulling.');
       await gasSyncService.processSyncQueue();
@@ -725,7 +833,7 @@ export const gasSyncService = {
       if (result.status === 'success' && result.data) {
         // What the Sheet holds now: the guard's reference for the next save.
         writeKnownCounts(countRows(result.data));
-        if (gasSyncService.hasLocalChangeDuringLoad) {
+        if (gasSyncService.hasLocalChangeDuringLoad && !neverRead) {
           console.warn('User edited data while Google App Script load was in progress. Discarding loaded server state to prevent rollback.');
           store.setSyncStatus('synced');
           return;
@@ -1309,6 +1417,10 @@ export const gasSyncService = {
         } finally {
           gasSyncService.isApplyingServerState = false;
         }
+      } else {
+        // The script answered, but not with the data: {status:'error', message}.
+        // This used to fall through and show DB SYNCED with nothing loaded.
+        throw new Error(`The Google Sheet could not be read: ${result?.message || 'the script reported an error'}`);
       }
       consecutivePollingErrors = 0;
       store.setSyncStatus('synced');
@@ -1334,6 +1446,7 @@ export const gasSyncService = {
       }
     } finally {
       gasSyncService.isPerformingLoad = false;
+      keepLocalOnConflict = false;
     }
   }
 };

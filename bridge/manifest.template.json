@@ -17,7 +17,8 @@
         "{{SERVER_PATH}}"
       ],
       "env": {
-        "PM_CODEX_PORT": "{{APP_PORT}}"
+        "PM_CODEX_PORT": "{{APP_PORT}}",
+        "PM_CODEX_NODE": "{{NODE_PATH}}"
       }
     }
   },

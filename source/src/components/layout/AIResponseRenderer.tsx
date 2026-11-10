@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import { MarkdownImage } from '../MarkdownImage';
 import remarkGfm from 'remark-gfm';
 import { DateVisualizer, isLikelyDateString, parseDateSafely } from '../DateVisualizer';
 
@@ -146,6 +147,8 @@ export const AIResponseRenderer: React.FC<MarkdownRendererProps> = ({ content, c
     ul: ({node, ...props}: any) => <ul className={`list-disc pl-4 my-2 space-y-1 ${isMono ? 'text-xs text-inherit' : 'text-sm text-qb-black'} marker:text-qb-orange`} {...props} />,
     ol: ({node, ...props}: any) => <ol className={`list-decimal pl-4 my-2 space-y-1 ${isMono ? 'text-xs text-inherit' : 'text-sm text-qb-black'} marker:text-qb-orange`} {...props} />,
     li: ({node, ...props}: any) => <li className="pl-1" {...props} />,
+    // A remote image is a link, never loaded by itself (components/MarkdownImage.tsx).
+    img: ({node, ...props}: any) => <MarkdownImage src={props.src} alt={props.alt} />,
     a: ({node, href, children, ...props}: any) => {
       const textContent = typeof children === 'string'
         ? children

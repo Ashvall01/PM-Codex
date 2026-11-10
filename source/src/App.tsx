@@ -115,13 +115,16 @@ export default function App() {
     let didTimeout = false;
     
     const controller = new AbortController();
+    // Apps Script takes several seconds to wake when it has not been used for a
+    // while. At 6 seconds a slow wake-up was read as "offline" and the Sheet
+    // was not loaded at all. The loading screen offers a way past after 3.5s.
     const timeoutId = setTimeout(() => {
       didTimeout = true;
-      console.warn("GAS action=version call timed out (6s). Falling back to local offline storage.");
+      console.warn("GAS action=version call timed out (20s). Falling back to local offline storage.");
       controller.abort();
-    }, 6000);
+    }, 20000);
     
-    fetch(`${gasUrl}?action=version&t=${new Date().getTime()}`, { signal: controller.signal, cache: 'no-store' })
+    fetch(`${gasUrl}${gasUrl.includes('?') ? '&' : '?'}action=version&t=${new Date().getTime()}`, { signal: controller.signal, cache: 'no-store' })
       .then(async res => {
          clearTimeout(timeoutId);
          if (!isMounted) return null;

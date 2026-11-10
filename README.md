@@ -15,7 +15,7 @@ your own Google Sheet, and works with Claude.
 
 ## What you need
 
-- A Mac (Windows comes later).
+- A Mac or a Windows PC.
 - [**Pinokio**](https://pinokio.co) — the free app that installs and runs local apps.
 - A Google account, for your own Google Sheet.
 - Optional: a **Gemini API key** ([Google AI Studio](https://aistudio.google.com/apikey)), to turn on
@@ -43,7 +43,8 @@ the wizard.
 
 1. Install the [Claude desktop app](https://claude.ai/download).
 2. In Pinokio → PM Codex, click **Connect to Claude**. Claude desktop shows an install window; click
-   **Install**.
+   **Install**. If no window appears, open Claude desktop → **Settings → Extensions → Advanced
+   settings → Install Extension** and choose `pm-codex-bridge.mcpb` in the PM Codex folder.
 3. Keep PM Codex open in your browser. In a new Claude conversation, say:
    **"Start a PM Codex session."**
 
@@ -58,7 +59,8 @@ Approve, Review line by line, or Reject.
    starts an empty app.
 3. **Your Gemini key stays on your computer.** Add, change or remove it in **Settings → Gemini**. The
    app checks it with Google and keeps it in the app folder's `secrets/` — never in the page, your
-   Sheet or git.
+   Sheet or git. (On a Mac the file is readable by your account only; on Windows it is as private as
+   your user folder.)
 
 ## Update
 
@@ -73,9 +75,12 @@ Pinokio → **Update**, then **Start** again. If Claude is connected, quit and r
 | `source/server.mjs` | The local server: serves the app and forwards Gemini calls with the key |
 | `bridge/` | The MCP bridge that lets Claude read the project and propose changes |
 | `bridge/directive.md` | The assistant's standing brief — edit it to change how Claude behaves |
+| `launcher/` | What Pinokio's buttons run (Update, Go back, Reset, Connect to Claude) — Node, so the same on macOS and Windows |
 
 - Build and run: `cd source && npm install && npm run build && npm start`
-- Tests: `npm run lint`, `npm run test:proxy`, and the suites in `source/test/` and `bridge/test/`.
+- Tests: `npm run lint`, `npm run test:proxy`, and the suites in `source/test/`, `bridge/test/` and
+  `launcher/test/`. Each push is also built and tested on Windows and macOS by GitHub
+  (`.github/workflows/check.yml`).
 - Rules for coding agents: `source/AGENTS.md`.
 - Code comments that cite `PLAN.md` point to the maintainer's design notes, which are not published.
 

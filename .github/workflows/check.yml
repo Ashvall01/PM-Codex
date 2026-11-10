@@ -1,0 +1,118 @@
+# PM Codex — build and test on a real Windows machine and a real Mac.
+#
+# The maintainer has no Windows computer. This is the proof that the app
+# installs, builds and passes every test there: it runs the same steps as
+# Pinokio's Install button, then the whole test table.
+#
+# Runs on every push and can be started by hand (Actions → Check → Run workflow).
+name: Check
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    env:
+      # As install.js does: the build must never see a key.
+      GEMINI_API_KEY: ""
+    steps:
+      # Files arrive as each system's git would hand them to a user: on Windows
+      # with CRLF line endings. The app must build and pass either way.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the app (as Pinokio's Install does)
+        working-directory: source
+        run: npm install --no-audit --no-fund
+      - name: Build the app
+        working-directory: source
+        run: npm run build
+      - name: Install the bridge
+        working-directory: bridge
+        run: npm install --no-audit --no-fund
+
+      - name: Launcher — Update, Go back, Reset, Connect to Claude
+        run: node launcher/test/launcher-test.mjs
+
+      - name: Bridge — macOS / Windows differences
+        working-directory: bridge
+        run: node test/platform-test.mjs
+      - name: Bridge — the Claude extension
+        working-directory: bridge
+        run: node test/mcpb-test.mjs
+      - name: Bridge — end to end, real hub (named pipe on Windows)
+        working-directory: bridge
+        run: node test/e2e.mjs
+      - name: Bridge log, if the end-to-end run failed
+        if: failure()
+        shell: bash
+        run: tail -n 200 bridge/bridge.log || true
+
+      - name: App — type check
+        working-directory: source
+        run: npm run lint
+      - name: App — local server and Gemini key
+        working-directory: source
+        run: node test/run-gemini-proxy-test.mjs
+      - name: App — change request review
+        working-directory: source
+        run: node test/run-acr-review-test.mjs
+      - name: App — edit guard
+        working-directory: source
+        run: node test/run-acr-edit-guard-test.mjs
+      - name: App — Gantt dates
+        working-directory: source
+        run: node test/run-gantt-dates-test.mjs
+      - name: App — executor
+        working-directory: source
+        run: node test/run-executor-test.mjs
+      - name: App — name masking
+        working-directory: source
+        run: node test/run-pii-masking-test.mjs
+      - name: App — name matcher
+        working-directory: source
+        run: node test/run-pii-matcher-test.mjs
+      - name: App — field rules
+        working-directory: source
+        run: node test/run-field-schema-test.mjs
+      - name: App — timeline sheet
+        working-directory: source
+        run: node test/run-sheet-engine-test.mjs
+      - name: App — saving to the Sheet
+        working-directory: source
+        run: node test/run-sync-test.mjs
+      - name: App — old versus new comparison
+        working-directory: source
+        run: node test/run-acr-diff-test.mjs
+      - name: App — web app address
+        working-directory: source
+        run: node test/run-web-app-url-test.mjs
+
+      - name: The server starts and serves the built app
+        shell: bash
+        run: |
+          cd source
+          node server.mjs > ../server.out 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:7800/ -o page.html 2>/dev/null; then break; fi
+            sleep 0.5
+          done
+          cat ../server.out
+          grep -q '<div id="root">' page.html

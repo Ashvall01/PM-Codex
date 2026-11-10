@@ -5,7 +5,8 @@ The small program that lets Claude read your PM Codex project and propose change
 ## Install
 
 In Pinokio → PM Codex, click **Connect to Claude**. Claude desktop shows an install window; click
-**Install**. That makes the extension for *this* computer (`tools/build-mcpb.mjs` writes
+**Install**. (No window? Claude desktop → Settings → Extensions → Advanced settings → Install
+Extension, and choose `pm-codex-bridge.mcpb` in the PM Codex folder.) That makes the extension for *this* computer (`tools/build-mcpb.mjs` writes
 `pm-codex-bridge.mcpb` from `manifest.template.json`). After an **Update** that changed this folder,
 quit and reopen Claude desktop. Then, in Claude, say: **"Start a PM Codex session."**
 
@@ -23,7 +24,7 @@ in your browser is the only thing that writes to your data.
 |---|---|
 | `hub.mjs` | Owns the connection to your browser. **One copy, ever.** Holds port 7799. |
 | `server.mjs` | The face Claude sees. Owns nothing. **Any number of copies.** |
-| `config.mjs` | Settings, logging, and `HUB_PROTOCOL`. Shared by both. |
+| `config.mjs` | Settings, logging, `HUB_PROTOCOL`, and the two things that differ by system: where the servers reach the hub (a socket file in `/tmp` on macOS, a named pipe on Windows) and which Node starts the hub. Shared by both. |
 
 Claude desktop starts the server several times in a few seconds. Only one process can hold port
 7799, so the browser connection lives in the hub and every server copy talks to it. The first hub
@@ -62,4 +63,5 @@ there, because Claude desktop discards the bridge's error output. Common causes:
 
 - `node test/e2e.mjs` — full check with a simulated app. Needs nothing running.
 - `node test/mcpb-test.mjs` — the extension builder and the allowed addresses.
+- `node test/platform-test.mjs` — the macOS / Windows differences: the hub's address and the Node that starts it.
 - `node test/live.mjs` — drives the real bridge against your real open tab.

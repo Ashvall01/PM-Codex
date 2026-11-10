@@ -37,6 +37,43 @@ to each call. The page holds a placeholder.
 - Gemini is optional. Show a failed call with `geminiErrorText(err)`; without a
   key the server's answer is already a plain sentence telling the user what to do.
 
+## Stored HTML is untrusted — `src/utils/safeHtml.ts`
+
+Rich text (minutes, Codex pages, notes) comes from assistants and from the Sheet, not only from the
+user's typing, and an assistant's proposal is shown before sign-off. **Never put stored HTML on the
+page raw.** Display goes through `sanitizeRichHtml`; plain text through `richTextToPlain` (not a
+detached `<div>` — its `innerHTML` still fetches images and runs their handlers); a Markdown image
+through `MarkdownImage` (a remote image is a link, never loaded by itself). Only the display is
+filtered; the stored text is not rewritten. In the editor, sanitize a value that arrives from
+outside — not the user's own typing echoed back, or the cursor jumps. Check with
+`tools/browser-check.mjs` (maintainer's tool, needs Playwright).
+
+## Saving — read before the first write
+
+`gasSyncService.pushOnce` is the only way to the Sheet. A browser with no row counts for the
+connected address has never read it: `pushOnce` reads and merges first and writes nothing if it
+cannot read. Do not add a save path around it, and do not write the row counts except after a read
+or a confirmed save. A field over 50,000 characters (one Sheet cell) refuses the whole save.
+
+## macOS and Windows — one code path
+
+PM Codex runs on both. Keep it that way:
+
+- **Pinokio lines are only `node …` or `npm …`** with plain arguments (`install.js`, `start.js`,
+  `update.js`, `rollback.js`, `reset.js`, `connect.js`). No quotes, `&&`, `||`, `$( )`, redirects,
+  `rm`, `open`: Pinokio on Windows runs them in cmd.exe. Put the logic in `launcher/*.mjs`.
+  `launcher/test/launcher-test.mjs` refuses anything else.
+- **Never start `npx`, `npm` or any `.cmd` with `execFile` / `spawn`** — on Windows they are not
+  programs. Start `node` with the script's path (`node_modules/typescript/bin/tsc`).
+- **Never `import()` a bare absolute path** — `C:\…` is not a URL. Use `pathToFileURL(p).href`.
+- **No `/tmp`, no `process.getuid()`, no file modes as a guarantee.** The hub's address comes from
+  `hubSocketPath()` in `bridge/config.mjs` (a named pipe on Windows — not a file, never unlink it).
+- **A link to a folder is a `'junction'`**, which Windows allows without special rights.
+- **A started program gets `windowsHide: true`**, or Windows flashes a console window.
+- Shortcut labels come from `MOD` / `REDO_KEYS` (`ActivityTable.tsx`), never a hard-coded "Cmd".
+
+Each push is built and tested on Windows and macOS by `.github/workflows/check.yml`.
+
 ## Files you must not modify
 
 This applies to any coding agent working on this repository.

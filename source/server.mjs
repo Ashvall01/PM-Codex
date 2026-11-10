@@ -6,8 +6,9 @@
 //      The key never reaches the browser: the page only ever holds a placeholder.
 //   3. Keep the Gemini key the user types into the app (setup wizard or
 //      Settings → Gemini). The page sends it here once; it is checked with
-//      Google, written to <app>/secrets/gemini-api-key (owner-only, ignored by
-//      git) and used at once. It is never sent back — the page only learns
+//      Google, written to <app>/secrets/gemini-api-key (owner-only on macOS
+//      and Linux; on Windows, which has no such file modes, as private as the
+//      user's own folder it sits in; ignored by git) and used at once. It is never sent back — the page only learns
 //      whether a key is set and its last four characters. A key in Pinokio's
 //      ENVIRONMENT (older installs) still works; a key saved in the app wins.
 //
@@ -90,7 +91,9 @@ function keyStatus() {
 }
 
 // Written to a temporary file first, then moved into place, so a crash never
-// leaves half a key. Owner-only: the folder 700, the file 600.
+// leaves half a key. Owner-only: the folder 700, the file 600. (Windows
+// ignores these modes without complaint; the user's profile folder is what
+// keeps the file private there.)
 function saveKey(key) {
   mkdirSync(SECRETS_DIR, { recursive: true, mode: 0o700 });
   try { chmodSync(SECRETS_DIR, 0o700); } catch { /* not ours to change — the file is still 600 */ }
@@ -308,6 +311,11 @@ if (currentKey() && existsSync(DIST)) {
 
 if (existsSync(DIST)) {
   app.use(express.static(DIST));
+  // A built file that is not there is "not found", never the app's page. After
+  // an Update the build's file names change; a tab left open then asks for a
+  // name that no longer exists. Answering with index.html made that a silent
+  // blank screen — with a 404 the page can say "updated, reload this tab".
+  app.use('/assets', (req, res) => res.status(404).type('text').send('Not found. PM Codex was probably updated: reload this tab.'));
   // Single-page app: any other address loads the app, which routes itself.
   app.get('*', (req, res) => res.sendFile(path.join(DIST, 'index.html')));
 } else {

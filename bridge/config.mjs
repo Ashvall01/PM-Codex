@@ -4,6 +4,7 @@
  */
 
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +24,9 @@ export const HERE = dirname(fileURLToPath(import.meta.url));
 // 5 — the app runs on this computer (http://localhost:7800). The hub reads
 //     allowedOrigins once, at start, so an older hub would keep refusing the
 //     new address; this bump stands it down.
+// 6 — Windows. The hub's address for the MCP servers is a named pipe there
+//     (hubSocketPath below), and hub.mjs no longer treats the address as a
+//     file it may delete. Nothing changes on macOS beyond the stand-down.
 //
 // BUMP THIS EVERY TIME hub.mjs CHANGES, however small the change.
 // The hub is a long-lived process that owns port 7799. Restarting the Claude
@@ -31,7 +35,7 @@ export const HERE = dirname(fileURLToPath(import.meta.url));
 // only thing that stands the old one down. Measured on 7 Sep: hub.mjs was edited,
 // the desktop app was restarted, and the hub from three hours earlier was still
 // serving.
-export const HUB_PROTOCOL = 5;
+export const HUB_PROTOCOL = 6;
 
 // The local app's port. Pinokio runs the app on 7800 unless PM_CODEX_PORT is
 // set; "Connect to Claude" writes the same value into the extension's
@@ -82,15 +86,94 @@ export function loadConfig() {
 /**
  * The address the MCP servers use to reach the hub.
  *
- * Deliberately NOT os.tmpdir(). On macOS a program started by an application
- * and the same program started from Terminal get different temporary folders,
- * so they would never find each other. /tmp is the same for everyone, and the
- * user id keeps two accounts on one Mac apart.
+ * macOS and Linux: a Unix socket. Deliberately NOT in os.tmpdir() — on macOS a
+ * program started by an application and the same program started from Terminal
+ * get different temporary folders, so they would never find each other. /tmp is
+ * the same for everyone, and the user id keeps two accounts on one Mac apart.
+ *
+ * Windows: a named pipe. Windows has no /tmp and no user id; a pipe name is the
+ * same from every program on the machine, and the account name keeps two
+ * accounts apart. A pipe is not a file: it is gone the moment the hub exits, so
+ * there is never a leftover to clear (see isNamedPipe).
  */
-export function hubSocketPath(config) {
+export function hubSocketPath(config, platform = process.platform) {
   if (config.hubSocketPath) return config.hubSocketPath;
+  if (platform === 'win32') return `\\\\.\\pipe\\pm-codex-bridge-${accountTag()}`;
   const uid = typeof process.getuid === 'function' ? process.getuid() : 'x';
   return `/tmp/pm-codex-bridge-${uid}.sock`;
+}
+
+/** True for a Windows named pipe, which must never be unlinked or chmod-ed. */
+export function isNamedPipe(address) {
+  return /^\\\\[.?]\\pipe\\/i.test(String(address || ''));
+}
+
+/** The account name, cut down to what a pipe name can safely hold. */
+function accountTag() {
+  let name = '';
+  try { name = userInfo().username; } catch { /* no account record — fall through */ }
+  name = name || process.env.USERNAME || process.env.USER || 'x';
+  return name.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 60) || 'x';
+}
+
+/** The file name at the end of a path written with either kind of slash. */
+function baseName(p) {
+  return String(p || '').split(/[\\/]/).pop() || '';
+}
+
+export function looksLikeNode(p) {
+  return /^node(\.exe)?$/i.test(baseName(p));
+}
+
+/**
+ * Which programs to try, in order, when a hub has to be started.
+ *
+ * NEVER the host application's own binary first. Inside Claude,
+ * process.execPath is "Claude Helper (Plugin)". Launching that as a detached
+ * process makes macOS see a second copy of a Claude helper starting by itself,
+ * and it asks the user for their keychain password before it will run. The
+ * user then gets a password prompt they did not ask for, from a bridge that has
+ * no business near their keychain, and the hub sits blocked behind the dialog
+ * looking like a crash.
+ *
+ * So: a real node binary, always.
+ *
+ *   1. PM_CODEX_NODE — the Node that ran "Connect to Claude", written into the
+ *      extension by tools/build-mcpb.mjs. That is Pinokio's own Node, the one
+ *      that installed and runs the app, so it is there on every computer that
+ *      has PM Codex — including one with no other Node anywhere, where the
+ *      fixed folders below hold nothing.
+ *   2. This process, when it really is node.
+ *   3. The usual install folders for this system.
+ *   4. `node`, for whatever PATH offers.
+ *   5. Last resort: this process run as node (ELECTRON_RUN_AS_NODE) — never a
+ *      macOS .app binary, for the keychain reason above.
+ */
+export function nodeCandidates({
+  execPath = process.execPath,
+  platform = process.platform,
+  env = process.env,
+  exists = existsSync,
+} = {}) {
+  const seen = new Set();
+  const list = [];
+  const push = (c) => { if (c && !seen.has(c)) { seen.add(c); list.push(c); } };
+  const pushIfThere = (c) => { if (c && exists(c)) push(c); };
+
+  pushIfThere(env.PM_CODEX_NODE);
+  if (looksLikeNode(execPath)) push(execPath);
+  if (platform === 'win32') {
+    for (const base of [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && `${env.LOCALAPPDATA}\\Programs`]) {
+      if (base) pushIfThere(`${base}\\nodejs\\node.exe`);
+    }
+  } else {
+    push('/usr/local/bin/node');
+    push('/opt/homebrew/bin/node');
+    push('/usr/bin/node');
+  }
+  push('node');
+  if (!looksLikeNode(execPath) && !/\.app\//.test(execPath || '')) push(execPath);
+  return list;
 }
 
 /**

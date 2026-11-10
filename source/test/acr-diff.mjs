@@ -13,14 +13,10 @@
  *
  * HOW TO RUN IT
  * -------------
- *   cd source
- *   npx tsc src/utils/acrDiff.ts --outDir /tmp/acrcheck --module esnext \
- *       --target es2020 --moduleResolution bundler --skipLibCheck
- *   cp /tmp/acrcheck/utils/acrDiff.js /tmp/acrcheck/acrDiff.mjs
- *   cp test/acr-diff.mjs /tmp/acrcheck/ && node /tmp/acrcheck/acr-diff.mjs
+ *   cd source && node test/run-acr-diff-test.mjs
  *
- * The compile step is here because the helper is TypeScript and this project
- * has no test runner. Keep it that way until one exists.
+ * The runner compiles the helper (it is TypeScript, and this project has no
+ * test runner) and puts it beside this file as ./acrDiff.mjs.
  */
 import {
   computeAcrDiffs, enrichWithAcr, acrFieldProps, acrUnshownDiffs,
