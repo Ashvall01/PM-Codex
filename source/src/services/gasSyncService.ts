@@ -134,23 +134,49 @@ const ROW_COUNTS_URL_KEY = 'pm-codex-sheet-row-counts-for';
  * read as null too. Null is what makes the first save read first: see
  * "READ BEFORE THE FIRST WRITE" in pushOnce.
  */
+/**
+ * The counts when the browser's storage would not take them.
+ *
+ * A browser that holds a large project sits at the storage limit, where a
+ * write is refused (the stores already live with that: safeStorage.ts). The
+ * counts are also the mark that "this browser has read the Sheet", so they
+ * must not depend on a write going through — on 10 Nov 2026 (v1.3.0) they did:
+ * the read succeeded, the mark could not be stored, and every save was refused
+ * as "could not read your Google Sheet". Kept here only while storage refuses;
+ * it lasts for this page, and the next page reads the Sheet first again.
+ */
+let countsInMemory: { url: string; counts: Record<string, number> } | null = null;
+
 const readKnownCounts = (): Record<string, number> | null => {
+  const url = useAppStore.getState().gasUrl || '';
+  if (countsInMemory) return countsInMemory.url === url ? countsInMemory.counts : null;
+  let raw: string | null = null;
+  let forUrl: string | null = null;
   try {
-    const raw = localStorage.getItem(ROW_COUNTS_KEY);
-    if (!raw) return null;
-    const url = useAppStore.getState().gasUrl || '';
-    const forUrl = localStorage.getItem(ROW_COUNTS_URL_KEY);
-    // Counts saved before the address was recorded belong to the Sheet in use.
-    if (forUrl === null) localStorage.setItem(ROW_COUNTS_URL_KEY, url);
-    else if (forUrl !== url) return null;
-    return JSON.parse(raw);
+    raw = localStorage.getItem(ROW_COUNTS_KEY);
+    forUrl = localStorage.getItem(ROW_COUNTS_URL_KEY);
   } catch { return null; }
+  if (!raw) return null;
+  if (forUrl !== null && forUrl !== url) return null;
+  let counts: Record<string, number> | null = null;
+  try { counts = JSON.parse(raw); } catch { return null; }
+  if (!counts || typeof counts !== 'object') return null;
+  // Counts saved before the address was recorded belong to the Sheet in use.
+  // If storage will not take the note, they still do.
+  if (forUrl === null) { try { localStorage.setItem(ROW_COUNTS_URL_KEY, url); } catch { /* storage is full */ } }
+  return counts;
 };
 const writeKnownCounts = (counts: Record<string, number>) => {
+  const url = useAppStore.getState().gasUrl || '';
+  let stored = false;
   try {
+    // Counts first, address second: if only the first goes through, the next
+    // page sees counts for another address and reads the Sheet first — safe.
     localStorage.setItem(ROW_COUNTS_KEY, JSON.stringify(counts));
-    localStorage.setItem(ROW_COUNTS_URL_KEY, useAppStore.getState().gasUrl || '');
-  } catch { /* the guard just starts fresh */ }
+    localStorage.setItem(ROW_COUNTS_URL_KEY, url);
+    stored = true;
+  } catch { /* storage is full: kept in memory below */ }
+  countsInMemory = stored ? null : { url, counts };
 };
 /**
  * Rows the user has asked to remove — a deleted project — are taken off the
@@ -188,34 +214,102 @@ export function describeLargeDeletions(known: Record<string, number> | null, nex
  *
  * One Google Sheets cell holds at most 50,000 characters. The script clears a
  * sheet and then writes it; a longer value makes that write fail — leaving
- * that sheet EMPTY and every sheet after it unwritten, with only the script's
- * own error ("Your input contains more than the maximum of 50000 characters in
- * a single cell") to go on, which does not say where. So the save is checked
- * here first: if any field is too long, nothing is written and the header
- * names the record. Lists and objects are measured as the script stores them
- * (as JSON text).
+ * that sheet EMPTY and every sheet after it unwritten. A long Codex page does
+ * it, and so does a change request with many signed-off lines (its `decided`
+ * list is one cell: 66,657 characters on 10 Nov 2026).
+ *
+ * So a value that is too long for one cell is written across several:
+ *
+ *   decided          the first part (readable in the Sheet as it always was)
+ *   decided__part2   "~" + the second part        (…__part3, and so on)
+ *   decided__parts   "parts=2;kind=j;len=66657"
+ *
+ * and joinLongCells puts it back together on the way in. Nothing changes for a
+ * value that fits, and the Apps Script is unchanged: to it these are ordinary
+ * columns. The "~" keeps Sheets and the script from reading a later part as
+ * anything but text (a leading apostrophe would be eaten, "[…]" parsed, a bare
+ * number converted). kind is j for a list or object (stored as JSON), s for
+ * text; len is the full length, checked when joining.
+ *
+ * v1.3.0 refused the whole save instead, which stopped all saving for a
+ * project that had one long change request. A version older than v1.3.1 reads
+ * only the first part of such a value.
  */
 export const SHEET_CELL_LIMIT = 50000;
-const SHEET_LABEL: Record<string, string> = {
-  ...GUARDED_SHEETS, acrs: 'change requests', aiSessions: 'chats', aiMessages: 'chat messages',
-};
-export function findOversizedCell(payload: Record<string, any>): string | null {
-  for (const [sheetName, records] of Object.entries(payload || {})) {
+const CELL_PART = 45000;
+const LONG_CELL_KEYS = /__part\d+$|__parts$/;
+const LONG_CELL_META = /^parts=(\d+);kind=([js]);len=(\d+)$/;
+
+function cutIntoParts(text: string, isJson: boolean): string[] {
+  const count = Math.ceil(text.length / CELL_PART);
+  const size = Math.ceil(text.length / count);
+  const parts: string[] = [];
+  for (let at = 0; at < text.length; at += size) parts.push(text.slice(at, at + size));
+  // The script parses a cell that starts with "[" or "{" when it can. A first
+  // part of plain text that happens to be complete JSON would come back
+  // rewritten; one character less and it is no longer complete.
+  if (!isJson && /^[[{]/.test(parts[0]) && parts.length > 1) {
+    try { JSON.parse(parts[0]); parts[1] = parts[0].slice(-1) + parts[1]; parts[0] = parts[0].slice(0, -1); } catch { /* not JSON: fine as it is */ }
+  }
+  return parts;
+}
+
+/** Spread every value too long for one cell across several. Changes `payload` in place. */
+export function splitLongCells(payload: Record<string, any>): Record<string, any> {
+  for (const records of Object.values(payload || {})) {
     if (!Array.isArray(records)) continue;
     for (const record of records) {
       if (!record || typeof record !== 'object') continue;
       for (const [field, value] of Object.entries(record)) {
-        const length = typeof value === 'string' ? value.length
-          : value && typeof value === 'object' ? JSON.stringify(value).length : 0;
-        if (length <= SHEET_CELL_LIMIT) continue;
-        const name = [record.title, record.name, record.description, record.activity, record.id]
-          .find((v) => typeof v === 'string' && v.trim());
-        const label = SHEET_LABEL[sheetName] || sheetName;
-        return `"${String(name || 'a record').trim().slice(0, 60)}" in ${label} is too long for the Google Sheet: its ${field} holds ${length.toLocaleString('en-US')} characters, and one cell takes ${SHEET_CELL_LIMIT.toLocaleString('en-US')}. Shorten it or split it in two. Nothing was written; your work is kept in this browser.`;
+        if (LONG_CELL_KEYS.test(field)) { delete record[field]; continue; } // never carried over from a load
+        const isJson = !!value && typeof value === 'object';
+        const text = typeof value === 'string' ? value : isJson ? JSON.stringify(value) : '';
+        if (text.length <= SHEET_CELL_LIMIT) continue;
+        const parts = cutIntoParts(text, isJson);
+        // Sheets drops one leading apostrophe (that is how a date is kept as
+        // text). A first part that begins with one gets a second, to lose.
+        record[field] = parts[0].startsWith("'") ? `'${parts[0]}` : parts[0];
+        parts.slice(1).forEach((part, i) => { record[`${field}__part${i + 2}`] = `~${part}`; });
+        record[`${field}__parts`] = `parts=${parts.length};kind=${isJson ? 'j' : 's'};len=${text.length}`;
       }
     }
   }
-  return null;
+  return payload;
+}
+
+/** The reverse of splitLongCells, on what the Sheet returned. Changes `data` in place. */
+export function joinLongCells(data: Record<string, any>): Record<string, any> {
+  const asText = (v: any) => (typeof v === 'string' ? v : v && typeof v === 'object' ? JSON.stringify(v) : v === undefined || v === null ? '' : String(v));
+  for (const [sheetName, rows] of Object.entries(data || {})) {
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      for (const key of Object.keys(row)) {
+        if (!key.endsWith('__parts')) continue;
+        const meta = LONG_CELL_META.exec(String(row[key] || ''));
+        if (!meta) continue; // an empty cell: this row's value fitted in one
+        const field = key.slice(0, -'__parts'.length);
+        const pieces = [asText(row[field])];
+        let whole = true;
+        for (let i = 2; i <= Number(meta[1]); i++) {
+          const part = row[`${field}__part${i}`];
+          if (typeof part === 'string' && part.startsWith('~')) pieces.push(part.slice(1));
+          else whole = false;
+        }
+        const text = pieces.join('');
+        if (!whole || text.length !== Number(meta[3])) {
+          console.warn(`[sync] ${sheetName}: a long "${field}" came back incomplete from the Sheet (${text.length} of ${meta[3]} characters); left as read.`);
+          continue;
+        }
+        if (meta[2] === 'j') { try { row[field] = JSON.parse(text); } catch { row[field] = text; } }
+        else row[field] = text;
+      }
+      // The helper columns exist on every row of the sheet (empty where the
+      // value fitted) and must never reach the stores.
+      for (const key of Object.keys(row)) if (LONG_CELL_KEYS.test(key)) delete row[key];
+    }
+  }
+  return data;
 }
 
 function isLocalNewer(localUpdatedAt: string, serverUpdatedAt: string): boolean {
@@ -720,12 +814,8 @@ export const gasSyncService = {
       }
       gasSyncService.allowLargeDeletionOnce = false;
       store.setSyncHeldBack(null);
-      const payload = sanitizePayload(rawPayload);
-      const tooLong = findOversizedCell(payload);
-      if (tooLong) {
-        store.setSyncStatus('error', tooLong);
-        return false;
-      }
+      // A value too long for one Sheet cell goes across several (THE CELL LIMIT).
+      const payload = splitLongCells(sanitizePayload(rawPayload));
 
       const response = await fetch(gasUrl, {
         method: 'POST',
@@ -808,6 +898,9 @@ export const gasSyncService = {
       let result;
       try {
         result = JSON.parse(text);
+        // Values that were written across several cells, back in one piece —
+        // before anything below looks at them.
+        if (result && result.data) joinLongCells(result.data);
         
         const removeDateQuotes = (val: any): any => {
           if (typeof val === 'string') {

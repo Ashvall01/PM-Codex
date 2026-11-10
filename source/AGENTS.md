@@ -53,7 +53,13 @@ outside — not the user's own typing echoed back, or the cursor jumps. Check wi
 `gasSyncService.pushOnce` is the only way to the Sheet. A browser with no row counts for the
 connected address has never read it: `pushOnce` reads and merges first and writes nothing if it
 cannot read. Do not add a save path around it, and do not write the row counts except after a read
-or a confirmed save. A field over 50,000 characters (one Sheet cell) refuses the whole save.
+or a confirmed save. The mark that a Sheet was read must not depend on a storage write going
+through — a browser at its storage limit refuses writes (`countsInMemory`).
+
+One Sheet cell holds 50,000 characters. A longer value is written across several cells
+(`splitLongCells`: `field`, `field__part2`…, `field__parts`) and joined on load (`joinLongCells`),
+with the Apps Script unchanged. Never refuse a save over length, and never let a `__part` column
+reach a store.
 
 ## macOS and Windows — one code path
 

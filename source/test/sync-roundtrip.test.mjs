@@ -86,7 +86,13 @@ globalThis.fetch = async (url, opts = {}) => {
       if (sheet.httpStatus !== 200) return reply(sheet.httpStatus, 'Server error', 'text/plain');
       if (sheet.htmlReply) return reply(200, '<!DOCTYPE html><html><body>Sign in</body></html>', 'text/html');
       if (sheet.failWrites) return reply(200, JSON.stringify({ status: 'error', message: 'Exception: simulated failure' }));
-      writeSheets(JSON.parse(opts.body));
+      const incoming = JSON.parse(opts.body);
+      // Google refuses a cell over 50,000 characters; the script reports it.
+      for (const records of Object.values(incoming)) for (const r of records || []) for (const v of Object.values(r)) {
+        const cell = Array.isArray(v) || (v && typeof v === 'object') ? JSON.stringify(v) : String(v ?? '');
+        if (cell.length > 50000) return reply(200, JSON.stringify({ status: 'error', message: 'Exception: Your input contains more than the maximum of 50000 characters in a single cell.' }));
+      }
+      writeSheets(incoming);
       return reply(200, JSON.stringify({ status: 'success' }));
     } finally {
       sheet.inFlight--;
@@ -111,6 +117,7 @@ const { useMomStore, normalizeMoMActionItemStatus } = await import('./store/momS
 const { useSyncQueueStore } = await import('./store/syncQueueStore.js');
 const { useCodexStore } = await import('./store/codexStore.js');
 const { useRisksStore } = await import('./store/risksStore.js');
+const { useAcrStore } = await import('./store/acrStore.js');
 
 const URL_ = 'http://fake-sheet.test/exec';
 const P = 'proj-1';
@@ -132,6 +139,8 @@ const resetAll = () => {
   useTasksStore.setState({ tasks: [] });
   useRisksStore.setState({ risks: [] });
   useMomStore.setState({ moms: [] });
+  useCodexStore.setState({ pages: [] });
+  useAcrStore.setState({ acrs: [] });
   useSyncQueueStore.setState({ jobs: [] });
   useAppStore.setState({ syncHeldBack: null });
   gasSyncService.allowLargeDeletionOnce = false;
@@ -405,6 +414,62 @@ ok('a read the script refuses is reported, not shown as saved', threw && useAppS
    && /could not be read/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
 sheet.loadError = false;
 
+// A browser at its storage limit: the Sheet is read, but the note that it was
+// read cannot be stored. v1.3.0 then refused every save as "could not read".
+{
+  const realSetItem = localStorage.setItem;
+  const full = (k, v) => { if (String(k).startsWith('pm-codex-sheet-row-counts')) { const e = new Error('The quota has been exceeded.'); e.name = 'QuotaExceededError'; throw e; } return realSetItem.call(localStorage, k, v); };
+
+  // (1) An existing browser: counts from before the address was recorded, storage full.
+  resetAll();
+  writeSheets({ tasks: Array.from({ length: 6 }, (_, i) => task(`t${i}`, `task ${i}`)), projects: [{ id: P, name: 'P', description: '', createdAt: 1 }] });
+  await run(() => gasSyncService.loadAll(URL_));
+  localStorage.removeItem('pm-codex-sheet-row-counts-for');
+  localStorage.setItem = full;
+  useTasksStore.setState({ tasks: [...useTasksStore.getState().tasks, task('t-new', 'added with storage full')] });
+  sheet.posts = 0; sheet.loads = 0;
+  saved = await run(() => gasSyncService.syncNow());
+  ok('storage full, existing browser: the save goes through', saved === true && sheet.db.tasks.length === 7 && useAppStore.getState().syncStatus === 'synced',
+     `saved=${saved}, ${useAppStore.getState().syncErrorMessage}`);
+  ok('…without reading the Sheet again first (it has read it)', sheet.loads === 0, `loads=${sheet.loads}`);
+
+  // (2) A new browser, storage full from the start: reads first, then saves, and keeps saving.
+  // (A new page: the in-memory counts last only as long as the page. A read
+  // with storage working again clears them, as a reload would.)
+  localStorage.setItem = realSetItem;
+  await run(() => gasSyncService.loadAll(URL_));
+  freshBrowser();
+  theirSheet();
+  localStorage.setItem = full;
+  useAppStore.setState({ projects: [{ id: 'proj-new', name: 'N', description: '', createdAt: 3 }] });
+  sheet.posts = 0; sheet.loads = 0;
+  saved = await run(() => gasSyncService.syncNow());
+  ok('storage full, new browser: it reads first, then the save goes through', saved === true && sheet.loads === 1 && sheet.db.tasks.length === 6 && sheet.db.projects.length === 3,
+     `saved=${saved}, loads=${sheet.loads}, ${useAppStore.getState().syncErrorMessage}`);
+  useTasksStore.setState({ tasks: [...useTasksStore.getState().tasks, task('t-more', 'second save')] });
+  saved = await run(() => gasSyncService.syncNow());
+  ok('…and the next save does not need another read', saved === true && sheet.loads === 1 && sheet.db.tasks.length === 7, `loads=${sheet.loads}`);
+  // The guard still has its counts, from memory. (No change is waiting, so
+  // the load below reads the Sheet rather than saving over it first.)
+  useSyncQueueStore.setState({ jobs: [] });
+  useTasksStore.setState({ tasks: [] });
+  writeSheets({ tasks: Array.from({ length: 30 }, (_, i) => task(`g${i}`, `g ${i}`)), projects: sheet.db.projects.map(p => ({ id: p.id, name: p.name, description: '', createdAt: 1 })) });
+  await run(() => gasSyncService.loadAll(URL_));
+  useTasksStore.setState({ tasks: [] });
+  saved = await run(() => gasSyncService.syncNow());
+  ok('…and the large-deletion guard still works with storage full', saved === false && sheet.db.tasks.length === 30 && /tasks & issues 30 → 0/.test(useAppStore.getState().syncHeldBack || ''),
+     `saved=${saved}, held=${useAppStore.getState().syncHeldBack}`);
+  // Another Sheet is still "never read", storage full or not.
+  useAppStore.setState({ gasUrl: 'http://fake-sheet.test/third/exec', syncHeldBack: null });
+  sheet.loads = 0;
+  await run(() => gasSyncService.syncNow());
+  ok('…and a different Sheet is still read before its first save', sheet.loads === 1, `loads=${sheet.loads}`);
+  localStorage.setItem = realSetItem;
+  // Storage takes writes again: back to the stored counts.
+  resetAll();
+  await run(() => gasSyncService.loadAll(URL_));
+}
+
 // Two reads asked for at once are one read.
 resetAll();
 theirSheet();
@@ -412,24 +477,82 @@ await run(() => Promise.all([gasSyncService.loadAll(URL_), gasSyncService.loadAl
 ok('two loads asked for at once make one request', sheet.loads === 1, `loads=${sheet.loads}`);
 
 // ------------------------------------------------------------ the cell limit
+// One Sheet cell holds 50,000 characters. The stand-in refuses a longer one the
+// way Google does, so a value that is not split fails here as it does there.
+const longestCell = () => Math.max(0, ...Object.values(sheet.db).flatMap(rows => rows.flatMap(r => Object.values(r).map(c =>
+  (typeof c === 'string' ? c : c && typeof c === 'object' ? String(c.text ?? c.date ?? '') : String(c)).length))));
+const reload = async () => {            // what another browser, or the next start, would read
+  useCodexStore.setState({ pages: [] }); useAcrStore.setState({ acrs: [] }); useTasksStore.setState({ tasks: [] });
+  useSyncQueueStore.setState({ jobs: [] });
+  await run(() => gasSyncService.loadAll(URL_));
+};
+const page = (content) => ({ id: 'c1', projectId: P, parentId: 'f1', title: 'Weekly status report', content, createdAt: '2026-11-10T00:00:00.000Z', updatedAt: '2026-11-10T00:00:00.000Z' });
+
+// The real case of 10 Nov 2026: a change request whose signed-off lines came to 66,657 characters.
 resetAll();
-writeSheets({ tasks: [task('t1', 'in the Sheet')], projects: [{ id: P, name: 'P', description: '', createdAt: 1 }] });
-await run(() => gasSyncService.loadAll(URL_));
-useCodexStore.setState({ pages: [{ id: 'c1', projectId: P, title: 'Weekly status report', content: 'x'.repeat(50001), updatedAt: '2026-11-10T00:00:00.000Z' }] });
-sheet.posts = 0;
+const decided = Array.from({ length: 40 }, (_, i) => ({
+  id: `d${i}`, name: 'updateMom', decision: i % 3 ? 'approved' : 'rejected', decidedAt: '2026-11-10T08:00:00.000Z',
+  args: { id: `m${i}`, date: '2026-11-10', time: '10:00', discussion: `<p>It's line ${i} — “quoted”, [bracketed], {braced}, =formula, 'apostrophe'</p>`.repeat(14) },
+  proposedArgs: { id: `m${i}`, discussion: `<p>original ${i}</p>`.repeat(20) },
+}));
+const acr = { id: '0bd2w3i', sessionId: 's1', projectId: P, origin: 'claude', status: 'approved', createdAt: '2026-11-10T07:00:00.000Z', updatedAt: '2026-11-10T08:00:00.000Z', changes: [], decided };
+ok('test set-up: the signed-off lines are longer than one cell', JSON.stringify(decided).length > 60000, String(JSON.stringify(decided).length));
+useAcrStore.setState({ acrs: [acr] });
+useTasksStore.setState({ tasks: [task('t1', 'an ordinary task')] });
 saved = await run(() => gasSyncService.syncNow());
-ok('a field longer than one Sheet cell: nothing is written', saved === false && sheet.posts === 0 && sheet.db.tasks.length === 1, `posts=${sheet.posts}`);
-ok('…and the header names the record, the field and the sizes', /"Weekly status report" in Codex pages/.test(useAppStore.getState().syncErrorMessage || '')
-   && /content holds 50,001 characters/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
-useCodexStore.setState({ pages: [{ id: 'c1', projectId: P, title: 'Weekly status report', content: 'x'.repeat(50000), updatedAt: '2026-11-10T00:00:00.000Z' }] });
+ok('a change request with a long signed-off list is saved (v1.3.0 refused the whole save)', saved === true && useAppStore.getState().syncStatus === 'synced',
+   `saved=${saved}, ${useAppStore.getState().syncErrorMessage}`);
+ok('…no cell in the Sheet is over the limit', longestCell() <= 50000, String(longestCell()));
+ok('…the rest of the project is saved with it', sheet.db.tasks?.[0]?.description === 'an ordinary task');
+await reload();
+const back = useAcrStore.getState().acrs[0];
+ok('…and reads back exactly as it was', JSON.stringify(back?.decided) === JSON.stringify(decided) && Array.isArray(back?.decided),
+   `${typeof back?.decided}, ${JSON.stringify(back?.decided || '').length} chars`);
+ok('…dates and times inside it keep their plain form', back?.decided?.[0]?.args?.date === '2026-11-10' && back?.decided?.[0]?.args?.time === '10:00', JSON.stringify(back?.decided?.[0]?.args?.date));
+ok('…with no helper column left on any record', [...useAcrStore.getState().acrs, ...useTasksStore.getState().tasks].every(r => !Object.keys(r).some(k => /__part/.test(k))),
+   Object.keys(back || {}).join(','));
 saved = await run(() => gasSyncService.syncNow());
-ok('exactly 50,000 characters fits', saved === true && sheet.db.codexPages?.[0]?.content.length === 50000);
-useCodexStore.setState({ pages: [] });
-useTasksStore.setState({ tasks: [{ ...task('t1', 'a task with very long comments'), comments: Array.from({ length: 60 }, (_, i) => ({ id: `c${i}`, text: 'y'.repeat(1000) })) }] });
-sheet.posts = 0;
+await reload();
+ok('…and survives a second save and load unchanged', JSON.stringify(useAcrStore.getState().acrs[0]?.decided) === JSON.stringify(decided));
+
+// Long text, with the characters Sheets and the script treat specially at every cut.
+resetAll();
+const tricky = ['\'', '[1,2,3]', '{"a":1}', '=SUM(A1)', '+1', '-1', '@x', '12.50', '2026-11-10', ' ', '~', '\n'];
+let longText = '';
+for (let i = 0; longText.length < 130000; i++) longText += tricky[i % tricky.length] + 'x'.repeat(997 + (i % 7));
+for (const [name, content] of [
+  ['three cells of awkward text', longText],
+  ['text that begins like a list', '[1,2,3]' + 'y'.repeat(60000)],
+  ['text whose first part alone is complete JSON', '["' + 'z'.repeat(30000) + '"]' + ' and then more'.repeat(2500)],
+  ['text of apostrophes only', '\''.repeat(70000)],
+  ['text of digits only', '7'.repeat(50001)],
+]) {
+  useCodexStore.setState({ pages: [page(content)] });
+  saved = await run(() => gasSyncService.syncNow());
+  const most = longestCell();
+  await reload();
+  ok(`a long Codex page comes back exactly: ${name}`, saved === true && most <= 50000 && useCodexStore.getState().pages[0]?.content === content,
+     `saved=${saved}, longest cell ${most}, back ${useCodexStore.getState().pages[0]?.content?.length} of ${content.length}`);
+}
+useCodexStore.setState({ pages: [page('x'.repeat(50000))] });
 saved = await run(() => gasSyncService.syncNow());
-ok('a list is measured as the Sheet stores it (as JSON)', saved === false && sheet.posts === 0
-   && /"a task with very long comments" in tasks & issues/.test(useAppStore.getState().syncErrorMessage || ''), useAppStore.getState().syncErrorMessage);
+ok('exactly 50,000 characters still goes in one cell', saved === true && sheet.db.codexPages[0].content.length === 50000 && !Object.keys(sheet.db.codexPages[0]).some(k => /__part/.test(k)));
+// Long, then shortened: the extra cells go away.
+useCodexStore.setState({ pages: [page(longText)] });
+await run(() => gasSyncService.syncNow());
+useCodexStore.setState({ pages: [page('short again')] });
+await run(() => gasSyncService.syncNow());
+await reload();
+ok('a page made short again is short in the Sheet and on reload', useCodexStore.getState().pages[0]?.content === 'short again'
+   && !Object.keys(sheet.db.codexPages[0]).some(k => /__part/.test(k)), Object.keys(sheet.db.codexPages[0]).join(','));
+// A list measured as the Sheet stores it.
+resetAll();
+const comments = Array.from({ length: 60 }, (_, i) => ({ id: `c${i}`, text: 'y'.repeat(1000), createdAt: 1 }));
+useTasksStore.setState({ tasks: [{ ...task('t1', 'a task with very long comments'), comments }] });
+saved = await run(() => gasSyncService.syncNow());
+await reload();
+ok('a task whose comments exceed one cell is saved and read back whole', saved === true && useTasksStore.getState().tasks[0]?.comments?.length === 60
+   && useTasksStore.getState().tasks[0].comments[59].text.length === 1000, `saved=${saved}, ${useTasksStore.getState().tasks[0]?.comments?.length}`);
 
 // ------------------------------------------------------------- bulk import
 resetAll();
